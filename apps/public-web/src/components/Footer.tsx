@@ -1,0 +1,62 @@
+import Link from "next/link";
+
+export function Footer() {
+  return (
+    <footer className="bg-gray-900 text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div>
+            <h3 className="text-xl font-bold text-orange-500 mb-4">
+              ELEPHANT 陸上クラブ
+            </h3>
+            <p className="text-gray-400">
+              走る楽しさを、すべての人に。
+              <br />
+              初心者からベテランまで、
+              <br />
+              一緒に走りましょう。
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-4">リンク</h4>
+            <ul className="space-y-2 text-gray-400">
+              <li>
+                <Link href="/about" className="hover:text-orange-500 transition-colors">
+                  クラブについて
+                </Link>
+              </li>
+              <li>
+                <Link href="/schedule" className="hover:text-orange-500 transition-colors">
+                  練習スケジュール
+                </Link>
+              </li>
+              <li>
+                <Link href="/news" className="hover:text-orange-500 transition-colors">
+                  お知らせ
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-orange-500 transition-colors">
+                  お問い合わせ
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-4">お問い合わせ</h4>
+            <ul className="space-y-2 text-gray-400">
+              <li>メール: info@elephant-track.com</li>
+              <li>活動拠点: 東京都</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-500">
+          <p>&copy; {new Date().getFullYear()} ELEPHANT 陸上クラブ. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+  );
+}
