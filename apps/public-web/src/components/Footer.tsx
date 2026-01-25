@@ -10,11 +10,9 @@ export function Footer() {
               ELEPHANT 陸上クラブ
             </h3>
             <p className="text-gray-400">
-              走る楽しさを、すべての人に。
+              北海道限定の
               <br />
-              初心者からベテランまで、
-              <br />
-              一緒に走りましょう。
+              陸上大会申込代行クラブ
             </p>
           </div>
 
@@ -32,8 +30,8 @@ export function Footer() {
           <div>
             <h4 className="font-semibold mb-4">お問い合わせ</h4>
             <ul className="space-y-2 text-gray-400">
-              <li>メール: info@elephant-track.com</li>
-              <li>活動拠点: 東京都</li>
+              <li>メール: athletics.elephant.club@gmail.com</li>
+              <li>活動拠点: 北海道</li>
             </ul>
           </div>
         </div>
