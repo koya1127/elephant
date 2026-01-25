@@ -22,23 +22,8 @@ export function Footer() {
             <h4 className="font-semibold mb-4">リンク</h4>
             <ul className="space-y-2 text-gray-400">
               <li>
-                <Link href="/about" className="hover:text-orange-500 transition-colors">
-                  クラブについて
-                </Link>
-              </li>
-              <li>
-                <Link href="/schedule" className="hover:text-orange-500 transition-colors">
-                  練習スケジュール
-                </Link>
-              </li>
-              <li>
-                <Link href="/news" className="hover:text-orange-500 transition-colors">
-                  お知らせ
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="hover:text-orange-500 transition-colors">
-                  お問い合わせ
+                <Link href="/" className="hover:text-orange-500 transition-colors">
+                  ホーム
                 </Link>
               </li>
             </ul>

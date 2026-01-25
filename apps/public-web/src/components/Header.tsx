@@ -5,10 +5,6 @@ import { useState } from "react";
 
 const navItems = [
   { href: "/", label: "ホーム" },
-  { href: "/about", label: "クラブについて" },
-  { href: "/schedule", label: "練習スケジュール" },
-  { href: "/news", label: "お知らせ" },
-  { href: "/contact", label: "お問い合わせ" },
 ];
 
 export function Header() {
