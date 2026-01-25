@@ -19,7 +19,7 @@ export default function HomePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Introduction */}
         <section className="mb-16">
-          <h2 className="text-2xl font-bold mb-6 text-gray-800">ELEPHANTとは</h2>
+          <h2 className="text-2xl font-bold mb-6 text-gray-800">エレファントとは</h2>
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
             <p className="text-blue-800 font-semibold">📍 北海道限定の陸上クラブです</p>
           </div>
@@ -31,6 +31,7 @@ export default function HomePage() {
             <p className="text-lg leading-relaxed">
               練習会や交流会は開催せず、大会エントリーの利便性向上に特化したクラブ運営を行っています。
               日本陸連への登録も含め、事務手続きは全てお任せください。
+              なお、クラブユニフォームはありません。
             </p>
           </div>
         </section>
