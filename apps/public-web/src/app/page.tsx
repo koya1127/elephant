@@ -173,7 +173,7 @@ export default function HomePage() {
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            ※ お問い合わせページよりご連絡ください
+            ※ お問い合わせ: athletics.elephant.club@gmail.com
           </p>
         </section>
       </div>
