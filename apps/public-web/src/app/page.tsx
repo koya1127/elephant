@@ -100,11 +100,8 @@ export default function HomePage() {
           
           {/* Fee Inclusion Highlight */}
           <div className="max-w-4xl mx-auto mb-8 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl p-6 shadow-md text-center border-4 border-orange-300">
-            <h3 className="text-xl md:text-2xl font-bold mb-3">📢 すべて「大会参加料」＆「陸連登録料」込みの年間サービス！</h3>
+            <h3 className="text-xl md:text-2xl font-bold mb-3">📢 すべて「大会参加料」＆「陸連登録料」込み！</h3>
             <div className="text-lg md:text-xl space-y-2">
-              <p>
-                各プランは1年間を通じて競技生活をサポートする<strong>年間サービス</strong>です。
-              </p>
               <p>
                 料金には、<strong>大会参加料</strong>や<strong>陸連登録費用</strong>が最初からすべて含まれています。
               </p>
@@ -122,7 +119,10 @@ export default function HomePage() {
                 初年度限定
               </div>
               <h3 className="text-2xl font-bold text-green-700 mb-2">入門プラン</h3>
-              <div className="text-4xl font-bold text-gray-800 mb-1">¥9,000</div>
+              <div className="flex items-baseline mb-1">
+                <span className="text-4xl font-bold text-gray-800">¥9,000</span>
+                <span className="text-gray-600 ml-1">/年</span>
+              </div>
               <p className="text-sm text-green-600 font-bold mb-4">登録料・参加料込み</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center font-bold text-green-700">
@@ -137,7 +137,10 @@ export default function HomePage() {
             {/* 単発レースプラン */}
             <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-700 mb-2">単発レースプラン</h3>
-              <div className="text-4xl font-bold text-gray-800 mb-1">¥15,000</div>
+              <div className="flex items-baseline mb-1">
+                <span className="text-4xl font-bold text-gray-800">¥15,000</span>
+                <span className="text-gray-600 ml-1">/年</span>
+              </div>
               <p className="text-sm text-gray-600 font-bold mb-4">登録料・参加料込み</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center font-bold text-gray-700">
@@ -152,7 +155,10 @@ export default function HomePage() {
             {/* ライトプラン */}
             <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
               <h3 className="text-2xl font-bold text-blue-700 mb-2">ライトプラン</h3>
-              <div className="text-4xl font-bold text-gray-800 mb-1">¥20,000</div>
+              <div className="flex items-baseline mb-1">
+                <span className="text-4xl font-bold text-gray-800">¥20,000</span>
+                <span className="text-gray-600 ml-1">/年</span>
+              </div>
               <p className="text-sm text-blue-600 font-bold mb-4">登録料・参加料込み</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center font-bold text-blue-600 text-lg">
@@ -167,7 +173,10 @@ export default function HomePage() {
             {/* スタンダードプラン */}
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-6 shadow-lg">
               <h3 className="text-2xl font-bold text-orange-700 mb-2">スタンダードプラン</h3>
-              <div className="text-4xl font-bold text-gray-800 mb-1">¥40,000</div>
+              <div className="flex items-baseline mb-1">
+                <span className="text-4xl font-bold text-gray-800">¥40,000</span>
+                <span className="text-gray-600 ml-1">/年</span>
+              </div>
               <p className="text-sm text-orange-600 font-bold mb-4">登録料・参加料込み</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center font-bold text-orange-600 text-lg">
@@ -182,7 +191,10 @@ export default function HomePage() {
             {/* プレミアムプラン */}
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-6 shadow-lg md:col-span-2 lg:col-span-1">
               <h3 className="text-2xl font-bold text-purple-700 mb-2">プレミアムプラン</h3>
-              <div className="text-4xl font-bold text-gray-800 mb-1">¥200,000</div>
+              <div className="flex items-baseline mb-1">
+                <span className="text-4xl font-bold text-gray-800">¥200,000</span>
+                <span className="text-gray-600 ml-1">/年</span>
+              </div>
               <p className="text-sm text-purple-600 font-bold mb-4">登録料・参加料込み</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center font-bold text-purple-600 text-lg">
@@ -203,10 +215,13 @@ export default function HomePage() {
               <div className="flex items-center justify-between border-b pb-4 mb-4">
                 <div className="flex-1">
                   <p className="text-xl font-bold text-gray-800">1大会追加</p>
-                  <p className="text-orange-600 font-bold text-2xl">¥5,000</p>
+                  <p className="text-orange-600 font-bold text-2xl">¥5,000<span className="text-sm text-gray-600 font-normal">/大会</span></p>
                 </div>
-                <div className="flex-1 text-sm text-gray-600">
-                  各プランの上限回数を超えて大会に出場したくなった場合のオプションです。<strong>（大会参加料込み）</strong>
+                <div className="flex-1 text-sm text-gray-600 font-bold">
+                  エントリー種目数問わず！<br />
+                  <span className="font-normal text-xs text-gray-500 text-gray-600">
+                    各プランの上限回数を超えて大会に出場したくなった場合のオプションです。<strong>（大会参加料込み）</strong>
+                  </span>
                 </div>
               </div>
 
@@ -221,11 +236,20 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="max-w-4xl mx-auto bg-orange-50 border-l-4 border-orange-500 rounded p-6 mb-6">
-            <h3 className="font-bold text-gray-800 mb-3 text-lg">📧 お申し込み方法</h3>
-            <p className="text-gray-700">
-              お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで
-            </p>
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="bg-blue-50 border-l-4 border-blue-500 rounded p-6">
+              <h3 className="font-bold text-gray-800 mb-2 text-lg">🏃 年間サービスとして</h3>
+              <p className="text-gray-700 leading-relaxed">
+                ELEPHANT陸上クラブの各プランは、1年間を通じてあなたの競技生活をトータルでサポートする<strong>年間サービス</strong>です。事務手続きのストレスから解放され、最高のコンディションで大会に臨んでください。
+              </p>
+            </div>
+
+            <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-6">
+              <h3 className="font-bold text-gray-800 mb-3 text-lg">📧 お申し込み方法</h3>
+              <p className="text-gray-700">
+                お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで
+              </p>
+            </div>
           </div>
 
           <div className="p-4 bg-gray-50 rounded-lg max-w-4xl mx-auto">
