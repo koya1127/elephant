@@ -109,9 +109,6 @@ export default function HomePage() {
                 大会のたびに参加料を払ったり、陸連登録費用を別途払う必要はありません！
               </p>
             </div>
-            <p className="mt-4 text-sm md:text-base opacity-90">
-              面倒な都度払いの手間をなくし、追加費用を気にせず競技に集中できる環境を提供します。
-            </p>
           </div>
 
           {/* Plans Grid */}
