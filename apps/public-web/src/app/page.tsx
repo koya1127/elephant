@@ -122,8 +122,11 @@ export default function HomePage() {
             <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-700 mb-2">単発レースプラン</h3>
               <div className="text-4xl font-bold text-gray-800 mb-1">¥15,000</div>
-              <p className="text-sm text-gray-600 mb-4">陸連登録なし</p>
+              <p className="text-sm text-gray-600 mb-4">&nbsp;</p>
               <div className="space-y-2 text-gray-700">
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 陸連登録代行
+                </p>
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 1試合エントリー
                 </p>
@@ -134,31 +137,28 @@ export default function HomePage() {
             <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
               <h3 className="text-2xl font-bold text-blue-700 mb-2">ライトプラン</h3>
               <div className="text-4xl font-bold text-gray-800 mb-1">¥20,000</div>
-              <p className="text-sm text-gray-600 mb-4">年間3試合</p>
+              <p className="text-sm text-gray-600 mb-4">&nbsp;</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
                 <p className="flex items-center">
-                  <span className="mr-2">✓</span> 3試合エントリー
+                  <span className="mr-2">✓</span> <strong>3試合エントリーまで</strong>
                 </p>
               </div>
             </div>
 
             {/* スタンダードプラン */}
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-6 shadow-lg relative">
-              <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                人気
-              </div>
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-6 shadow-lg">
               <h3 className="text-2xl font-bold text-orange-700 mb-2">スタンダードプラン</h3>
               <div className="text-4xl font-bold text-gray-800 mb-1">¥40,000</div>
-              <p className="text-sm text-gray-600 mb-4">年間8試合</p>
+              <p className="text-sm text-gray-600 mb-4">&nbsp;</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
                 <p className="flex items-center">
-                  <span className="mr-2">✓</span> 8試合エントリー
+                  <span className="mr-2">✓</span> <strong>8試合エントリーまで</strong>
                 </p>
               </div>
             </div>
@@ -167,13 +167,13 @@ export default function HomePage() {
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-6 shadow-lg md:col-span-2 lg:col-span-1">
               <h3 className="text-2xl font-bold text-purple-700 mb-2">プレミアムプラン</h3>
               <div className="text-4xl font-bold text-gray-800 mb-1">¥200,000</div>
-              <p className="text-sm text-gray-600 mb-4">年間50試合</p>
+              <p className="text-sm text-gray-600 mb-4">&nbsp;</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
                 <p className="flex items-center">
-                  <span className="mr-2">✓</span> 50試合エントリー
+                  <span className="mr-2">✓</span> <strong>50試合エントリーまで</strong>
                 </p>
               </div>
             </div>
@@ -193,18 +193,14 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* 料金の内訳説明 */}
-          <div className="max-w-4xl mx-auto bg-blue-50 border-l-4 border-blue-500 rounded p-6">
-            <h3 className="font-bold text-gray-800 mb-4">💡 料金について</h3>
-            <div className="space-y-2 text-sm text-gray-700">
-              <p>• 試合登録作業時間：約15分/件</p>
-              <p>• 陸連登録作業時間：約45分</p>
-              <p>• 大会参加費：平均2,000円/試合（別途実費）</p>
-              <p>• 陸連登録料：4,400円/年（別途実費）</p>
-            </div>
+          <div className="max-w-4xl mx-auto bg-orange-50 border-l-4 border-orange-500 rounded p-6 mb-6">
+            <h3 className="font-bold text-gray-800 mb-3 text-lg">📧 お申し込み方法</h3>
+            <p className="text-gray-700">
+              お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで連絡してね
+            </p>
           </div>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg max-w-4xl mx-auto">
+          <div className="p-4 bg-gray-50 rounded-lg max-w-4xl mx-auto">
             <h3 className="font-semibold text-gray-800 mb-2">💳 決済手段</h3>
             <p className="text-gray-600">銀行振込・PayPayに対応</p>
           </div>
