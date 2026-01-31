@@ -205,7 +205,7 @@ export default function HomePage() {
           <div className="max-w-4xl mx-auto bg-orange-50 border-l-4 border-orange-500 rounded p-6 mb-6">
             <h3 className="font-bold text-gray-800 mb-3 text-lg">📧 お申し込み方法</h3>
             <p className="text-gray-700">
-              お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで連絡してね
+              お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで
             </p>
           </div>
 
