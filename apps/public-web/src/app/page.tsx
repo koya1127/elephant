@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "ELEPHANT 陸上クラブ | 北海道限定の大会申込代行クラブ",
-  description: "ELEPHANT陸上クラブは、陸上大会のエントリー申込代行を行う北海道限定の陸上クラブです。大会エントリーの手間を省き、簡単に大会参加ができます。",
+  title: "ELEPHANT 陸上クラブ | 北海道限定の陸連登録・大会申込代行クラブ",
+  description: "ELEPHANT陸上クラブは、陸連登録と陸上大会のエントリー申込代行を行う北海道限定の陸上クラブです。複数のプランから選べて、大会エントリーの手間を省き、簡単に大会参加ができます。",
 };
 
 export default function HomePage() {
@@ -25,12 +25,12 @@ export default function HomePage() {
           </div>
           <div className="prose max-w-none text-gray-600">
             <p className="text-lg leading-relaxed mb-4">
-              陸上競技者のための大会申込代行を行う陸上クラブです。
-              煩雑なエントリー手続きや支払いを代行し、競技に専念できる環境を提供します。
+              陸上競技者のための<strong>陸連登録代行</strong>と<strong>大会申込代行</strong>を行う陸上クラブです。
+              煩雑な登録手続きやエントリー手続きを代行し、競技に専念できる環境を提供します。
             </p>
             <p className="text-lg leading-relaxed">
-              練習会や交流会は開催せず、大会エントリーの利便性向上に特化したクラブ運営を行っています。
-              日本陸連への登録も含め、事務手続きは全てお任せください。
+              練習会や交流会は開催せず、事務手続きの利便性向上に特化したクラブ運営を行っています。
+              日本陸連への登録から大会エントリーまで、全ての事務手続きをお任せください。
               なお、クラブユニフォームはありません。
             </p>
           </div>
@@ -74,103 +74,139 @@ export default function HomePage() {
               <div className="text-3xl mb-3">📝</div>
               <h3 className="text-xl font-semibold mb-3 text-orange-600">ワンストップ申込</h3>
               <p className="text-gray-600">
-                大会と種目を伝えるだけ。フォーム入力や書類準備は不要です。
+                陸連登録から大会エントリーまで全て代行。フォーム入力や書類準備は不要です。
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <div className="text-3xl mb-3">💰</div>
-              <h3 className="text-xl font-semibold mb-3 text-orange-600">シーズン一括決済</h3>
+              <h3 className="text-xl font-semibold mb-3 text-orange-600">選べるプラン</h3>
               <p className="text-gray-600">
-                シーズン単位で清算。大会ごとの振込手続きは不要です。
+                入門からプレミアムまで、参加スタイルに合わせた料金プランをご用意。
               </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <div className="text-3xl mb-3">🏃</div>
               <h3 className="text-xl font-semibold mb-3 text-orange-600">陸連登録サポート</h3>
               <p className="text-gray-600">
-                陸連への登録手続きも代行。事務作業に時間を取られません。
+                陸連への登録手続きも代行（45分の作業時間）。事務作業から解放されます。
               </p>
             </div>
           </div>
         </section>
 
-        {/* Payment System - Visual Flow */}
+        {/* Pricing Plans */}
         <section className="mb-16">
-          <h2 className="text-2xl font-bold mb-6 text-gray-800">お支払いの仕組み</h2>
+          <h2 className="text-2xl font-bold mb-8 text-gray-800 text-center">料金プラン</h2>
           
-          {/* Simple Flow */}
-          <div className="bg-orange-50 rounded-lg p-6 mb-6">
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4 max-w-5xl mx-auto">
-              {/* 期初 */}
-              <div className="bg-white rounded-lg p-6 shadow-md flex-1 w-full md:w-auto">
-                <div className="text-xl font-bold text-orange-600 mb-3">期初</div>
-                <div className="text-gray-600 mb-2">前金をお預かり</div>
-                <div className="text-4xl font-bold text-gray-800">¥10,000</div>
+          {/* Plans Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-8">
+            {/* 入門プラン */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-xl p-6 shadow-lg relative">
+              <div className="absolute top-4 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                初年度限定
               </div>
-              
-              <div className="text-3xl text-orange-500 transform md:rotate-0 rotate-90">→</div>
-              
-              {/* シーズン中 */}
-              <div className="bg-white rounded-lg p-6 shadow-md flex-1 w-full md:w-auto">
-                <div className="text-xl font-bold text-orange-600 mb-3">シーズン中</div>
-                <div className="text-gray-600 mb-2">大会に参加</div>
-                <div className="text-lg font-semibold text-gray-800">毎回の振込不要！</div>
+              <h3 className="text-2xl font-bold text-green-700 mb-2">入門プラン</h3>
+              <div className="text-4xl font-bold text-gray-800 mb-1">¥9,000</div>
+              <p className="text-sm text-gray-600 mb-4">一人一回まで</p>
+              <div className="space-y-2 text-gray-700">
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 陸連登録代行
+                </p>
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 1試合エントリー
+                </p>
               </div>
-              
-              <div className="text-3xl text-orange-500 transform md:rotate-0 rotate-90">→</div>
-              
-              {/* 期末 */}
-              <div className="bg-white rounded-lg p-6 shadow-md flex-1 w-full md:w-auto">
-                <div className="text-xl font-bold text-orange-600 mb-3">期末</div>
-                <div className="text-gray-600 mb-2">差額を精算</div>
-                <div className="font-semibold text-gray-800">追加払い or 返金</div>
+            </div>
+
+            {/* 単発レースプラン */}
+            <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
+              <h3 className="text-2xl font-bold text-gray-700 mb-2">単発レースプラン</h3>
+              <div className="text-4xl font-bold text-gray-800 mb-1">¥15,000</div>
+              <p className="text-sm text-gray-600 mb-4">陸連登録なし</p>
+              <div className="space-y-2 text-gray-700">
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 1試合エントリー
+                </p>
+              </div>
+            </div>
+
+            {/* ライトプラン */}
+            <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
+              <h3 className="text-2xl font-bold text-blue-700 mb-2">ライトプラン</h3>
+              <div className="text-4xl font-bold text-gray-800 mb-1">¥20,000</div>
+              <p className="text-sm text-gray-600 mb-4">年間3試合</p>
+              <div className="space-y-2 text-gray-700">
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 陸連登録代行
+                </p>
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 3試合エントリー
+                </p>
+              </div>
+            </div>
+
+            {/* スタンダードプラン */}
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-6 shadow-lg relative">
+              <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                人気
+              </div>
+              <h3 className="text-2xl font-bold text-orange-700 mb-2">スタンダードプラン</h3>
+              <div className="text-4xl font-bold text-gray-800 mb-1">¥40,000</div>
+              <p className="text-sm text-gray-600 mb-4">年間8試合</p>
+              <div className="space-y-2 text-gray-700">
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 陸連登録代行
+                </p>
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 8試合エントリー
+                </p>
+              </div>
+            </div>
+
+            {/* プレミアムプラン */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-6 shadow-lg md:col-span-2 lg:col-span-1">
+              <h3 className="text-2xl font-bold text-purple-700 mb-2">プレミアムプラン</h3>
+              <div className="text-4xl font-bold text-gray-800 mb-1">¥200,000</div>
+              <p className="text-sm text-gray-600 mb-4">年間50試合</p>
+              <div className="space-y-2 text-gray-700">
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 陸連登録代行
+                </p>
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 50試合エントリー
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Examples */}
-          <div className="space-y-4 max-w-2xl mx-auto">
-            <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
-              <h3 className="font-bold text-gray-800 mb-2">📊 例1：追加払いのケース</h3>
-              <div className="text-gray-700">
-                前金 1万円 → シーズン中に 1.3万円使用 → <span className="font-bold text-green-700">期末に差額 3千円を支払い</span>
-              </div>
-            </div>
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-              <h3 className="font-bold text-gray-800 mb-2">📊 例2：返金のケース</h3>
-              <div className="text-gray-700">
-                前金 1万円 → シーズン中に 8千円使用 → <span className="font-bold text-blue-700">期末に差額 2千円を返金</span>
+          {/* 追加オプション */}
+          <div className="max-w-2xl mx-auto mb-8">
+            <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-6 shadow-md">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">追加オプション</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-gray-800">1試合追加</p>
+                  <p className="text-sm text-gray-600">プラン契約者向け</p>
+                </div>
+                <div className="text-3xl font-bold text-orange-600">¥5,000</div>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg max-w-2xl mx-auto">
+          {/* 料金の内訳説明 */}
+          <div className="max-w-4xl mx-auto bg-blue-50 border-l-4 border-blue-500 rounded p-6">
+            <h3 className="font-bold text-gray-800 mb-4">💡 料金について</h3>
+            <div className="space-y-2 text-sm text-gray-700">
+              <p>• 試合登録作業時間：約15分/件</p>
+              <p>• 陸連登録作業時間：約45分</p>
+              <p>• 大会参加費：平均2,000円/試合（別途実費）</p>
+              <p>• 陸連登録料：4,400円/年（別途実費）</p>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg max-w-4xl mx-auto">
             <h3 className="font-semibold text-gray-800 mb-2">💳 決済手段</h3>
             <p className="text-gray-600">銀行振込・PayPayに対応</p>
-          </div>
-        </section>
-
-        {/* Pricing - Card Style */}
-        <section className="mb-16">
-          <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">料金体系</h2>
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-6 shadow-lg">
-              <div className="text-sm font-semibold mb-2 opacity-90">年会費</div>
-              <div className="text-5xl font-bold mb-2">¥2,000</div>
-              <div className="text-sm opacity-90">/年</div>
-            </div>
-            <div className="bg-gradient-to-br from-gray-700 to-gray-800 text-white rounded-xl p-6 shadow-lg">
-              <div className="text-sm font-semibold mb-2 opacity-90">エントリー代行手数料</div>
-              <div className="text-5xl font-bold mb-2">¥300</div>
-              <div className="text-sm opacity-90">/大会</div>
-            </div>
-          </div>
-          
-          <div className="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded max-w-3xl mx-auto">
-            <p className="text-sm text-gray-700">
-              <strong>💡 ポイント：</strong>同一大会内であれば、複数種目も一律300円<br />
-              <span className="text-gray-600">（例：100m単独 → 300円 / 100m・200m → 300円）</span>
-            </p>
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-500">
