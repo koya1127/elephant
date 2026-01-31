@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "ELEPHANT 陸上クラブ | 北海道限定の陸連登録・大会申込代行クラブ",
-  description: "ELEPHANT陸上クラブは、陸連登録と陸上大会のエントリー申込代行を行う北海道限定の陸上クラブです。複数のプランから選べて、大会エントリーの手間を省き、簡単に大会参加ができます。",
+  description: "ELEPHANT陸上クラブは、陸連登録と陸上大会のエントリー申込代行を行う北海道限定の年間サービス型陸上クラブです。複数のプランから選べて、大会エントリーの手間を省き、簡単に大会参加ができます。",
 };
 
 export default function HomePage() {
@@ -100,10 +100,13 @@ export default function HomePage() {
           
           {/* Fee Inclusion Highlight */}
           <div className="max-w-4xl mx-auto mb-8 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl p-6 shadow-md text-center border-4 border-orange-300">
-            <h3 className="text-xl md:text-2xl font-bold mb-3">📢 すべて「大会参加料」＆「陸連登録料」込み！</h3>
+            <h3 className="text-xl md:text-2xl font-bold mb-3">📢 すべて「大会参加料」＆「陸連登録料」込みの年間サービス！</h3>
             <div className="text-lg md:text-xl space-y-2">
               <p>
-                各プランの料金には、<strong>大会参加料</strong>や<strong>陸連登録費用</strong>が最初からすべて含まれています。
+                各プランは1年間を通じて競技生活をサポートする<strong>年間サービス</strong>です。
+              </p>
+              <p>
+                料金には、<strong>大会参加料</strong>や<strong>陸連登録費用</strong>が最初からすべて含まれています。
               </p>
               <p className="bg-white/20 py-2 px-4 rounded-lg font-bold">
                 大会のたびに参加料を払ったり、陸連登録費用を別途払う必要はありません！
