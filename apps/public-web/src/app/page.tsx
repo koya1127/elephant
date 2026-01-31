@@ -17,6 +17,62 @@ export default function HomePage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* The High Wall of Track & Field Section */}
+        <section className="mb-16">
+          <h2 className="text-2xl font-bold mb-8 text-center text-gray-800">
+            陸上競技は「出場するまで」が最大の難関？
+          </h2>
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 mb-8">
+            <h3 className="text-xl font-bold text-red-800 mb-4 flex items-center">
+              <span className="text-2xl mr-2">⚠️</span> 陸上は「登録制」のスポーツです
+            </h3>
+            <p className="text-gray-700 leading-relaxed">
+              公式記録が残る大会に出場するには、ただ申し込むだけでは不十分です。<br />
+              <strong>「日本陸連への登録」「都道府県陸協への登録」「地区陸協への登録」</strong>、そして各大会ごとのエントリー…。<br />
+              これらは社会人ランナーでも初心者でも、公式大会に出るなら避けては通れません。
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="text-orange-500 font-bold mb-2">WALL 01</div>
+              <h4 className="font-bold text-lg mb-3 text-gray-800">複雑な登録システム</h4>
+              <p className="text-sm text-gray-600 leading-relaxed text-justify">
+                JAAF-STARTでの個人登録、所属の選択、本人確認、承認待ち…。分厚いPDFマニュアルを片手に、画面とにらめっこする時間が数時間続くことも珍しくありません。
+              </p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="text-orange-500 font-bold mb-2">WALL 02</div>
+              <h4 className="font-bold text-lg mb-3 text-gray-800">乱立する申込方法</h4>
+              <div className="text-xs text-gray-500 space-y-1 mb-3">
+                <span className="inline-block bg-gray-100 px-2 py-0.5 rounded mr-1">NANS21V</span>
+                <span className="inline-block bg-gray-100 px-2 py-0.5 rounded mr-1">AthleteRanking</span>
+                <span className="inline-block bg-gray-100 px-2 py-0.5 rounded mr-1">Excelマクロ</span>
+                <span className="inline-block bg-gray-100 px-2 py-0.5 rounded mr-1">独自Webシステム</span>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed text-justify">
+                大会ごとに使うシステムが異なり、支払い方法（銀行振込・現金書留など）もバラバラ。前回覚えたやり方が、次の大会では一切通用しません。
+              </p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="text-orange-500 font-bold mb-2">WALL 03</div>
+              <h4 className="font-bold text-lg mb-3 text-gray-800">膨大な時間の損失</h4>
+              <p className="text-sm text-gray-600 leading-relaxed text-justify font-bold">
+                慣れた人でも15分、初心者は調べるところから始めて2時間。
+              </p>
+              <p className="text-sm text-gray-600 leading-relaxed text-justify mt-2 font-semibold text-red-600">
+                1回のエントリーに2時間以上奪われることもあります。
+              </p>
+            </div>
+          </div>
+          
+          <div className="mt-12 text-center">
+            <div className="inline-block bg-gray-800 text-white px-8 py-4 rounded-full text-lg font-bold">
+              その煩わしい事務手続き、私たちがすべて代行します。
+            </div>
+          </div>
+        </section>
+
         {/* Introduction */}
         <section className="mb-16">
           <h2 className="text-2xl font-bold mb-6 text-gray-800">エレファントとは</h2>
@@ -217,9 +273,9 @@ export default function HomePage() {
                   <p className="text-xl font-bold text-gray-800">1大会追加</p>
                   <p className="text-orange-600 font-bold text-2xl">¥5,000<span className="text-sm text-gray-600 font-normal">/大会</span></p>
                 </div>
-                <div className="flex-1 text-sm text-gray-600 font-bold">
+                <div className="flex-1 text-sm text-gray-600 font-bold text-right">
                   エントリー種目数問わず！<br />
-                  <span className="font-normal text-xs text-gray-500 text-gray-600">
+                  <span className="font-normal text-xs text-gray-500">
                     各プランの上限回数を超えて大会に出場したくなった場合のオプションです。<strong>（大会参加料込み）</strong>
                   </span>
                 </div>
@@ -227,7 +283,7 @@ export default function HomePage() {
 
               <div className="bg-white p-4 rounded border border-gray-200">
                 <p className="text-sm font-bold text-gray-700 mb-2">💡 例えばこんな時に：</p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 leading-relaxed text-justify">
                   「入門プラン（1大会まで）で登録したけど、調子が良いので<strong>2大会目も出場したい！</strong>」
                   <br />
                   そんな時は＋5,000円で2大会目のエントリー代行も承ります。
@@ -237,14 +293,14 @@ export default function HomePage() {
           </div>
 
           <div className="max-w-4xl mx-auto space-y-6">
-            <div className="bg-blue-50 border-l-4 border-blue-500 rounded p-6">
+            <div className="bg-blue-50 border-l-4 border-blue-500 rounded p-6 shadow-sm">
               <h3 className="font-bold text-gray-800 mb-2 text-lg">🏃 年間サービスとして</h3>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-gray-700 leading-relaxed text-justify">
                 ELEPHANT陸上クラブの各プランは、1年間を通じてあなたの競技生活をトータルでサポートする<strong>年間サービス</strong>です。事務手続きのストレスから解放され、最高のコンディションで大会に臨んでください。
               </p>
             </div>
 
-            <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-6">
+            <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-6 shadow-sm">
               <h3 className="font-bold text-gray-800 mb-3 text-lg">📧 お申し込み方法</h3>
               <p className="text-gray-700">
                 お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで
@@ -252,9 +308,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg max-w-4xl mx-auto">
+          <div className="p-4 bg-gray-50 rounded-lg max-w-4xl mx-auto mt-8">
             <h3 className="font-semibold text-gray-800 mb-2">💳 決済手段</h3>
-            <p className="text-gray-600">銀行振込・PayPayに対応</p>
+            <p className="text-gray-600 text-sm">銀行振込・PayPayに対応</p>
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-500">
