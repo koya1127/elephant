@@ -122,11 +122,11 @@ export default function HomePage() {
               <div className="text-4xl font-bold text-gray-800 mb-1">¥9,000</div>
               <p className="text-sm text-green-600 font-bold mb-4">登録料・参加料込み</p>
               <div className="space-y-2 text-gray-700">
-                <p className="flex items-center">
-                  <span className="mr-2">✓</span> 陸連登録代行
-                </p>
                 <p className="flex items-center font-bold text-green-700">
                   <span className="mr-2">✓</span> 1大会エントリーまで
+                </p>
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 陸連登録代行
                 </p>
               </div>
             </div>
@@ -137,11 +137,11 @@ export default function HomePage() {
               <div className="text-4xl font-bold text-gray-800 mb-1">¥15,000</div>
               <p className="text-sm text-gray-600 font-bold mb-4">登録料・参加料込み</p>
               <div className="space-y-2 text-gray-700">
-                <p className="flex items-center">
-                  <span className="mr-2">✓</span> 陸連登録代行
-                </p>
                 <p className="flex items-center font-bold text-gray-700">
                   <span className="mr-2">✓</span> 1大会エントリーまで
+                </p>
+                <p className="flex items-center">
+                  <span className="mr-2">✓</span> 陸連登録代行
                 </p>
               </div>
             </div>
