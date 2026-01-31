@@ -88,7 +88,7 @@ export default function HomePage() {
               <div className="text-3xl mb-3">🏃</div>
               <h3 className="text-xl font-semibold mb-3 text-orange-600">陸連登録サポート</h3>
               <p className="text-gray-600">
-                陸連への登録手続きも代行（45分の作業時間）。事務作業から解放されます。
+                陸連への登録手続きも代行。煩雑な事務作業から解放されます。
               </p>
             </div>
           </div>
@@ -112,8 +112,8 @@ export default function HomePage() {
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
-                <p className="flex items-center">
-                  <span className="mr-2">✓</span> 1試合エントリー
+                <p className="flex items-center font-bold text-green-700">
+                  <span className="mr-2">✓</span> 1大会エントリーまで
                 </p>
               </div>
             </div>
@@ -127,8 +127,8 @@ export default function HomePage() {
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
-                <p className="flex items-center">
-                  <span className="mr-2">✓</span> 1試合エントリー
+                <p className="flex items-center font-bold text-gray-700">
+                  <span className="mr-2">✓</span> 1大会エントリーまで
                 </p>
               </div>
             </div>
@@ -139,7 +139,7 @@ export default function HomePage() {
               <div className="text-4xl font-bold text-gray-800 mb-4">¥20,000</div>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center font-bold text-blue-600 text-lg">
-                  <span className="mr-2">✓</span> 3試合エントリーまで
+                  <span className="mr-2">✓</span> 3大会エントリーまで
                 </p>
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
@@ -153,7 +153,7 @@ export default function HomePage() {
               <div className="text-4xl font-bold text-gray-800 mb-4">¥40,000</div>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center font-bold text-orange-600 text-lg">
-                  <span className="mr-2">✓</span> 8試合エントリーまで
+                  <span className="mr-2">✓</span> 8大会エントリーまで
                 </p>
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
@@ -167,7 +167,7 @@ export default function HomePage() {
               <div className="text-4xl font-bold text-gray-800 mb-4">¥200,000</div>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center font-bold text-purple-600 text-lg">
-                  <span className="mr-2">✓</span> 50試合エントリーまで
+                  <span className="mr-2">✓</span> 50大会エントリーまで
                 </p>
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
@@ -177,15 +177,27 @@ export default function HomePage() {
           </div>
 
           {/* 追加オプション */}
-          <div className="max-w-2xl mx-auto mb-8">
+          <div className="max-w-3xl mx-auto mb-8">
             <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-6 shadow-md">
               <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">追加オプション</h3>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-gray-800">1試合追加</p>
-                  <p className="text-sm text-gray-600">プラン契約者向け</p>
+              
+              <div className="flex items-center justify-between border-b pb-4 mb-4">
+                <div className="flex-1">
+                  <p className="text-xl font-bold text-gray-800">1大会追加</p>
+                  <p className="text-orange-600 font-bold text-2xl">¥5,000</p>
                 </div>
-                <div className="text-3xl font-bold text-orange-600">¥5,000</div>
+                <div className="flex-1 text-sm text-gray-600">
+                  各プランの上限回数を超えて大会に出場したくなった場合のオプションです。
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded border border-gray-200">
+                <p className="text-sm font-bold text-gray-700 mb-2">💡 例えばこんな時に：</p>
+                <p className="text-sm text-gray-600">
+                  「入門プラン（1大会まで）で登録したけど、調子が良いので<strong>2大会目も出場したい！</strong>」
+                  <br />
+                  そんな時は＋5,000円で2大会目のエントリー代行も承ります。
+                </p>
               </div>
             </div>
           </div>
