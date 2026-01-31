@@ -26,7 +26,7 @@ export default function HomePage() {
           <div className="prose max-w-none text-gray-600">
             <p className="text-lg leading-relaxed mb-4">
               陸上競技者のための<strong>陸連登録代行</strong>と<strong>大会申込代行</strong>を行う陸上クラブです。
-              煩雑な登録手続きやエントリー手続きを代行し、競技に専える環境を提供します。
+              煩雑な登録手続きやエントリー手続きを代行し、競技に専念できる環境を提供します。
             </p>
             <p className="text-lg leading-relaxed">
               練習会や交流会は開催せず、事務手続きの利便性向上に特化したクラブ運営を行っています。
@@ -212,7 +212,7 @@ export default function HomePage() {
                 <p className="text-sm text-gray-600">
                   「入門プラン（1大会まで）で登録したけど、調子が良いので<strong>2大会目も出場したい！</strong>」
                   <br />
-                  そんな時は＋5,000円で2大会目のエントリー代行も承ります。もちろん追加の参加料支払いは不要です。
+                  そんな時は＋5,000円で2大会目のエントリー代行も承ります。
                 </p>
               </div>
             </div>
