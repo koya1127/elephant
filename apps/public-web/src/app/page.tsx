@@ -137,13 +137,13 @@ export default function HomePage() {
             <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
               <h3 className="text-2xl font-bold text-blue-700 mb-2">ライトプラン</h3>
               <div className="text-4xl font-bold text-gray-800 mb-1">¥20,000</div>
-              <p className="text-sm text-gray-600 mb-4">&nbsp;</p>
+              <p className="text-base font-bold text-blue-600 mb-4">年間3試合まで</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
                 <p className="flex items-center">
-                  <span className="mr-2">✓</span> <strong>3試合エントリーまで</strong>
+                  <span className="mr-2">✓</span> 大会エントリー申込代行
                 </p>
               </div>
             </div>
@@ -152,13 +152,13 @@ export default function HomePage() {
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-6 shadow-lg">
               <h3 className="text-2xl font-bold text-orange-700 mb-2">スタンダードプラン</h3>
               <div className="text-4xl font-bold text-gray-800 mb-1">¥40,000</div>
-              <p className="text-sm text-gray-600 mb-4">&nbsp;</p>
+              <p className="text-base font-bold text-orange-600 mb-4">年間8試合まで</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
                 <p className="flex items-center">
-                  <span className="mr-2">✓</span> <strong>8試合エントリーまで</strong>
+                  <span className="mr-2">✓</span> 大会エントリー申込代行
                 </p>
               </div>
             </div>
@@ -167,13 +167,13 @@ export default function HomePage() {
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-6 shadow-lg md:col-span-2 lg:col-span-1">
               <h3 className="text-2xl font-bold text-purple-700 mb-2">プレミアムプラン</h3>
               <div className="text-4xl font-bold text-gray-800 mb-1">¥200,000</div>
-              <p className="text-sm text-gray-600 mb-4">&nbsp;</p>
+              <p className="text-base font-bold text-purple-600 mb-4">年間50試合まで</p>
               <div className="space-y-2 text-gray-700">
                 <p className="flex items-center">
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
                 <p className="flex items-center">
-                  <span className="mr-2">✓</span> <strong>50試合エントリーまで</strong>
+                  <span className="mr-2">✓</span> 大会エントリー申込代行
                 </p>
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function HomePage() {
           <div className="max-w-4xl mx-auto bg-orange-50 border-l-4 border-orange-500 rounded p-6 mb-6">
             <h3 className="font-bold text-gray-800 mb-3 text-lg">📧 お申し込み方法</h3>
             <p className="text-gray-700">
-              お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで連絡してください
+              お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで連絡してね
             </p>
           </div>
 
