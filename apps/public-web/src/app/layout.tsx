@@ -10,8 +10,11 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "ELEPHANT 陸上クラブ",
+  title: "エレファント陸上クラブ",
   description: "走る楽しさを、すべての人に。初心者からベテランまで歓迎する陸上クラブです。",
+  verification: {
+    google: "8L403oHgq7VfT-c-5rq7WF6oUV0kVk3EfwXWx-CYoBI",
+  },
 };
 
 export default function RootLayout({

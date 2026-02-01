@@ -7,7 +7,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <h3 className="text-xl font-bold text-orange-500 mb-4">
-              エレファント 陸上クラブ
+              エレファント陸上クラブ
             </h3>
             <p className="text-gray-400">
               北海道限定の
@@ -37,7 +37,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-500">
-          <p>&copy; {new Date().getFullYear()} エレファント 陸上クラブ. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} エレファント陸上クラブ. All rights reserved.</p>
         </div>
       </div>
     </footer>

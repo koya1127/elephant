@@ -15,8 +15,8 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center space-x-2">
-            <span className="text-2xl font-bold text-orange-600">ELEPHANT</span>
-            <span className="text-sm text-gray-600 hidden sm:inline">陸上クラブ</span>
+            <span className="text-2xl md:text-3xl font-bold text-orange-600 tracking-tighter">エレファント</span>
+            <span className="text-sm text-gray-600 hidden sm:inline font-bold">陸上クラブ</span>
           </Link>
 
           {/* Desktop Navigation */}

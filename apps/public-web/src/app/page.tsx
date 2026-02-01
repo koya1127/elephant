@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "ELEPHANT 陸上クラブ | 北海道限定の陸連登録・大会申込代行クラブ",
-  description: "ELEPHANT陸上クラブは、陸連登録と陸上大会のエントリー申込代行を行う北海道限定の年間サービス型陸上クラブです。複数のプランから選べて、大会エントリーの手間を省き、簡単に大会参加ができます。",
+  title: "エレファント陸上クラブ | 北海道限定の陸連登録・大会申込代行クラブ",
+  description: "エレファント陸上クラブは、陸連登録と陸上大会のエントリー申込代行を行う北海道限定の年間サービス型陸上クラブです。複数のプランから選べて、大会エントリーの手間を省き、簡単に大会参加ができます。",
 };
 
 export default function HomePage() {
   return (
     <div className="py-16">
       {/* Page Header */}
-      <div className="bg-orange-500 text-white py-12 mb-12">
+      <div className="bg-orange-50 text-white py-12 mb-12 text-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl md:text-4xl font-bold">ELEPHANT 陸上クラブ</h1>
-          <p className="mt-2 text-orange-100">Track & Field Club</p>
+          <h1 className="text-3xl md:text-5xl font-bold">エレファント陸上クラブ</h1>
+          <p className="mt-2 text-orange-100 text-lg">Track & Field Club</p>
         </div>
       </div>
 
@@ -296,7 +296,7 @@ export default function HomePage() {
             <div className="bg-blue-50 border-l-4 border-blue-500 rounded p-6 shadow-sm">
               <h3 className="font-bold text-gray-800 mb-2 text-lg">🏃 年間サービスとして</h3>
               <p className="text-gray-700 leading-relaxed text-justify">
-                ELEPHANT陸上クラブの各プランは、1年間を通じてあなたの競技生活をトータルでサポートする<strong>年間サービス</strong>です。事務手続きのストレスから解放され、最高のコンディションで大会に臨んでください。
+                エレファント陸上クラブの各プランは、1年間を通じてあなたの競技生活をトータルでサポートする<strong>年間サービス</strong>です。事務手続きのストレスから解放され、最高のコンディションで大会に臨んでください。
               </p>
             </div>
 
