@@ -9,7 +9,7 @@ export default function HomePage() {
   return (
     <div className="py-16">
       {/* Page Header */}
-      <div className="bg-orange-50 text-white py-12 mb-12 text-center">
+      <div className="bg-orange-500 text-white py-12 mb-12 text-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl md:text-5xl font-bold">エレファント陸上クラブ</h1>
           <p className="mt-2 text-orange-100 text-lg">Track & Field Club</p>
