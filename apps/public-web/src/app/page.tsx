@@ -170,7 +170,7 @@ export default function HomePage() {
           {/* Plans Grid */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-8">
             {/* 入門プラン */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-xl p-6 shadow-lg relative">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-xl p-6 shadow-lg relative flex flex-col">
               <div className="absolute top-4 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
                 初年度限定
               </div>
@@ -180,7 +180,7 @@ export default function HomePage() {
                 <span className="text-gray-600 ml-1">/年</span>
               </div>
               <p className="text-sm text-green-600 font-bold mb-4">登録料・参加料込み</p>
-              <div className="space-y-2 text-gray-700">
+              <div className="space-y-2 text-gray-700 mb-8 flex-grow">
                 <p className="flex items-center font-bold text-green-700">
                   <span className="mr-2">✓</span> 1大会エントリーまで
                 </p>
@@ -188,17 +188,25 @@ export default function HomePage() {
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
               </div>
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                このプランで申し込む
+              </a>
             </div>
 
             {/* 単発レースプラン */}
-            <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
+            <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg flex flex-col">
               <h3 className="text-2xl font-bold text-gray-700 mb-2">単発レースプラン</h3>
               <div className="flex items-baseline mb-1">
                 <span className="text-4xl font-bold text-gray-800">¥15,000</span>
                 <span className="text-gray-600 ml-1">/年</span>
               </div>
               <p className="text-sm text-gray-600 font-bold mb-4">登録料・参加料込み</p>
-              <div className="space-y-2 text-gray-700">
+              <div className="space-y-2 text-gray-700 mb-8 flex-grow">
                 <p className="flex items-center font-bold text-gray-700">
                   <span className="mr-2">✓</span> 1大会エントリーまで
                 </p>
@@ -206,17 +214,25 @@ export default function HomePage() {
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
               </div>
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center bg-gray-700 text-white font-bold py-3 rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                このプランで申し込む
+              </a>
             </div>
 
             {/* ライトプラン */}
-            <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg">
+            <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg flex flex-col">
               <h3 className="text-2xl font-bold text-blue-700 mb-2">ライトプラン</h3>
               <div className="flex items-baseline mb-1">
                 <span className="text-4xl font-bold text-gray-800">¥20,000</span>
                 <span className="text-gray-600 ml-1">/年</span>
               </div>
               <p className="text-sm text-blue-600 font-bold mb-4">登録料・参加料込み</p>
-              <div className="space-y-2 text-gray-700">
+              <div className="space-y-2 text-gray-700 mb-8 flex-grow">
                 <p className="flex items-center font-bold text-blue-600 text-lg">
                   <span className="mr-2">✓</span> 3大会エントリーまで
                 </p>
@@ -224,17 +240,25 @@ export default function HomePage() {
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
               </div>
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                このプランで申し込む
+              </a>
             </div>
 
             {/* スタンダードプラン */}
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-6 shadow-lg">
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-6 shadow-lg flex flex-col">
               <h3 className="text-2xl font-bold text-orange-700 mb-2">スタンダードプラン</h3>
               <div className="flex items-baseline mb-1">
                 <span className="text-4xl font-bold text-gray-800">¥40,000</span>
                 <span className="text-gray-600 ml-1">/年</span>
               </div>
               <p className="text-sm text-orange-600 font-bold mb-4">登録料・参加料込み</p>
-              <div className="space-y-2 text-gray-700">
+              <div className="space-y-2 text-gray-700 mb-8 flex-grow">
                 <p className="flex items-center font-bold text-orange-600 text-lg">
                   <span className="mr-2">✓</span> 8大会エントリーまで
                 </p>
@@ -242,17 +266,25 @@ export default function HomePage() {
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
               </div>
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition-colors"
+              >
+                このプランで申し込む
+              </a>
             </div>
 
             {/* プレミアムプラン */}
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-6 shadow-lg md:col-span-2 lg:col-span-1">
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-6 shadow-lg md:col-span-2 lg:col-span-1 flex flex-col">
               <h3 className="text-2xl font-bold text-purple-700 mb-2">プレミアムプラン</h3>
               <div className="flex items-baseline mb-1">
                 <span className="text-4xl font-bold text-gray-800">¥200,000</span>
                 <span className="text-gray-600 ml-1">/年</span>
               </div>
               <p className="text-sm text-purple-600 font-bold mb-4">登録料・参加料込み</p>
-              <div className="space-y-2 text-gray-700">
+              <div className="space-y-2 text-gray-700 mb-8 flex-grow">
                 <p className="flex items-center font-bold text-purple-600 text-lg">
                   <span className="mr-2">✓</span> 50大会エントリーまで
                 </p>
@@ -260,6 +292,14 @@ export default function HomePage() {
                   <span className="mr-2">✓</span> 陸連登録代行
                 </p>
               </div>
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                このプランで申し込む
+              </a>
             </div>
           </div>
 
@@ -293,17 +333,28 @@ export default function HomePage() {
           </div>
 
           <div className="max-w-4xl mx-auto space-y-6">
-            <div className="bg-blue-50 border-l-4 border-blue-500 rounded p-6 shadow-sm">
+            <div className="bg-blue-50 border-l-4 border-blue-500 rounded p-6 shadow-sm text-center">
               <h3 className="font-bold text-gray-800 mb-2 text-lg">🏃 年間サービスとして</h3>
-              <p className="text-gray-700 leading-relaxed text-justify">
+              <p className="text-gray-700 leading-relaxed">
                 エレファント陸上クラブの各プランは、1年間を通じてあなたの競技生活をトータルでサポートする<strong>年間サービス</strong>です。事務手続きのストレスから解放され、最高のコンディションで大会に臨んでください。
               </p>
             </div>
 
-            <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-6 shadow-sm">
-              <h3 className="font-bold text-gray-800 mb-3 text-lg">📧 お申し込み方法</h3>
-              <p className="text-gray-700">
-                お申し込みは <strong className="text-orange-700">athletics.elephant.club@gmail.com</strong> まで
+            <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-8 shadow-md text-center">
+              <h3 className="font-bold text-gray-800 mb-4 text-xl">📧 お申し込み方法</h3>
+              <p className="text-gray-700 mb-6 text-lg font-medium">
+                専用フォームから簡単にお申し込みいただけます。
+              </p>
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-orange-600 text-white font-bold py-4 px-10 rounded-full text-lg hover:bg-orange-700 transition-colors shadow-lg"
+              >
+                お申し込みフォームを開く
+              </a>
+              <p className="mt-8 text-sm text-gray-500">
+                ご質問等は <strong className="text-gray-700">athletics.elephant.club@gmail.com</strong> までお気軽にご連絡ください。
               </p>
             </div>
           </div>
