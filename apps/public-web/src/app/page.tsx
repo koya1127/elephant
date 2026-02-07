@@ -167,8 +167,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Plans Grid - With Registration */}
-          <div className="max-w-6xl mx-auto mb-12">
+          {/* Full Support Plans Group */}
+          <div className="max-w-6xl mx-auto mb-16">
             <h3 className="text-2xl font-bold mb-8 text-gray-800 border-l-4 border-orange-500 pl-4">
               陸連登録・大会申込 フルサポートプラン
             </h3>
@@ -202,9 +202,9 @@ export default function HomePage() {
                 </a>
               </div>
 
-              {/* 単発レースプラン */}
+              {/* 単発プラン */}
               <div className="bg-white border-2 border-gray-300 rounded-xl p-6 shadow-lg flex flex-col">
-                <h3 className="text-2xl font-bold text-gray-700 mb-2">単発レースプラン</h3>
+                <h3 className="text-2xl font-bold text-gray-700 mb-2">単発プラン</h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-4xl font-bold text-gray-800">¥15,000</span>
                   <span className="text-gray-600 ml-1">/年</span>
@@ -308,19 +308,19 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Plans Grid - Without Registration */}
-          <div className="max-w-6xl mx-auto mb-8">
+          {/* Entry Only Plans Group */}
+          <div className="max-w-6xl mx-auto mb-16">
             <h3 className="text-2xl font-bold mb-4 text-gray-800 border-l-4 border-gray-400 pl-4">
               大会申込のみプラン（陸連登録はご自身で行う方）
             </h3>
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8 rounded">
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8 rounded shadow-sm">
               <p className="text-red-700 text-sm font-bold leading-relaxed">
-                ※こちらのプランは当クラブでの陸連登録代行は行いません。既に個人または他団体で陸連登録がお済みの方のみご利用いただけます。必ずご自身で登録を済ませてからお申し込みください。
+                ⚠️ こちらのプランは当クラブでの陸連登録代行は行いません。既に個人または他団体で今年度の陸連登録がお済みの方のみご利用いただけます。必ずご自身で登録を済ませてからお申し込みください。
               </p>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* 入門プラン（なし） */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col opacity-90 hover:opacity-100 transition-opacity">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col">
                 <h3 className="text-xl font-bold text-gray-700 mb-2">入門プラン<br /><span className="text-sm font-normal">（陸連登録なし）</span></h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-3xl font-bold text-gray-800">¥3,000</span>
@@ -331,23 +331,23 @@ export default function HomePage() {
                   <p className="flex items-center font-bold">
                     <span className="mr-2">✓</span> 1大会エントリーまで
                   </p>
-                  <p className="flex items-center text-gray-400">
+                  <p className="flex items-center text-gray-400 italic">
                     <span className="mr-2">×</span> 陸連登録なし（各自）
                   </p>
                 </div>
                 <a
-                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-center border-2 border-gray-600 text-gray-700 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="block text-center border-2 border-gray-400 text-gray-600 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   このプランで申し込む
                 </a>
               </div>
 
-              {/* 単発レースプラン（なし） */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col opacity-90 hover:opacity-100 transition-opacity">
-                <h3 className="text-xl font-bold text-gray-700 mb-2">単発レースプラン<br /><span className="text-sm font-normal">（陸連登録なし）</span></h3>
+              {/* 単発プラン（なし） */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col">
+                <h3 className="text-xl font-bold text-gray-700 mb-2">単発プラン<br /><span className="text-sm font-normal">（陸連登録なし）</span></h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-3xl font-bold text-gray-800">¥5,000</span>
                   <span className="text-gray-600 ml-1">/年</span>
@@ -357,22 +357,22 @@ export default function HomePage() {
                   <p className="flex items-center font-bold">
                     <span className="mr-2">✓</span> 1大会エントリーまで
                   </p>
-                  <p className="flex items-center text-gray-400">
+                  <p className="flex items-center text-gray-400 italic">
                     <span className="mr-2">×</span> 陸連登録なし（各自）
                   </p>
                 </div>
                 <a
-                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-center border-2 border-gray-600 text-gray-700 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="block text-center border-2 border-gray-400 text-gray-600 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   このプランで申し込む
                 </a>
               </div>
 
               {/* ライトプラン（なし） */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col opacity-90 hover:opacity-100 transition-opacity">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col">
                 <h3 className="text-xl font-bold text-gray-700 mb-2">ライトプラン<br /><span className="text-sm font-normal">（陸連登録なし）</span></h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-3xl font-bold text-gray-800">¥12,000</span>
@@ -380,25 +380,25 @@ export default function HomePage() {
                 </div>
                 <p className="text-xs text-gray-500 mb-4">大会参加料込み</p>
                 <div className="space-y-2 text-sm text-gray-600 mb-8 flex-grow">
-                  <p className="flex items-center font-bold text-blue-600">
+                  <p className="flex items-center font-bold">
                     <span className="mr-2">✓</span> 3大会エントリーまで
                   </p>
-                  <p className="flex items-center text-gray-400">
+                  <p className="flex items-center text-gray-400 italic">
                     <span className="mr-2">×</span> 陸連登録なし（各自）
                   </p>
                 </div>
                 <a
-                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-center border-2 border-gray-600 text-gray-700 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="block text-center border-2 border-gray-400 text-gray-600 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   このプランで申し込む
                 </a>
               </div>
 
               {/* スタンダードプラン（なし） */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col opacity-90 hover:opacity-100 transition-opacity">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col">
                 <h3 className="text-xl font-bold text-gray-700 mb-2">スタンダードプラン<br /><span className="text-sm font-normal">（陸連登録なし）</span></h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-3xl font-bold text-gray-800">¥30,000</span>
@@ -406,25 +406,25 @@ export default function HomePage() {
                 </div>
                 <p className="text-xs text-gray-500 mb-4">大会参加料込み</p>
                 <div className="space-y-2 text-sm text-gray-600 mb-8 flex-grow">
-                  <p className="flex items-center font-bold text-orange-600">
+                  <p className="flex items-center font-bold">
                     <span className="mr-2">✓</span> 8大会エントリーまで
                   </p>
-                  <p className="flex items-center text-gray-400">
+                  <p className="flex items-center text-gray-400 italic">
                     <span className="mr-2">×</span> 陸連登録なし（各自）
                   </p>
                 </div>
                 <a
-                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-center border-2 border-gray-600 text-gray-700 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="block text-center border-2 border-gray-400 text-gray-600 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   このプランで申し込む
                 </a>
               </div>
 
               {/* プレミアムプラン（なし） */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col opacity-90 hover:opacity-100 transition-opacity md:col-span-2 lg:col-span-1">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col md:col-span-2 lg:col-span-1">
                 <h3 className="text-xl font-bold text-gray-700 mb-2">プレミアムプラン<br /><span className="text-sm font-normal">（陸連登録なし）</span></h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-3xl font-bold text-gray-800">¥190,000</span>
@@ -432,29 +432,27 @@ export default function HomePage() {
                 </div>
                 <p className="text-xs text-gray-500 mb-4">大会参加料込み</p>
                 <div className="space-y-2 text-sm text-gray-600 mb-8 flex-grow">
-                  <p className="flex items-center font-bold text-purple-600">
+                  <p className="flex items-center font-bold">
                     <span className="mr-2">✓</span> 50大会エントリーまで
                   </p>
-                  <p className="flex items-center text-gray-400">
+                  <p className="flex items-center text-gray-400 italic">
                     <span className="mr-2">×</span> 陸連登録なし（各自）
                   </p>
                 </div>
                 <a
-                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-center border-2 border-gray-600 text-gray-700 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="block text-center border-2 border-gray-400 text-gray-600 font-bold py-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   このプランで申し込む
                 </a>
               </div>
             </div>
           </div>
->>>>+++ REPLACE
-
 
           {/* 追加オプション */}
-          <div className="max-w-3xl mx-auto mb-8">
+          <div className="max-w-3xl mx-auto mb-16">
             <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-6 shadow-md">
               <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">追加オプション</h3>
               
@@ -474,8 +472,7 @@ export default function HomePage() {
               <div className="bg-white p-4 rounded border border-gray-200">
                 <p className="text-sm font-bold text-gray-700 mb-2">💡 例えばこんな時に：</p>
                 <p className="text-sm text-gray-600 leading-relaxed text-justify">
-                  「入門プラン（1大会まで）で登録したけど、調子が良いので<strong>2大会目も出場したい！</strong>」
-                  <br />
+                  「入門プラン（1大会まで）で登録したけど、調子が良いので<strong>2大会目も出場したい！</strong>」<br />
                   そんな時は＋5,000円で2大会目のエントリー代行も承ります。
                 </p>
               </div>
