@@ -320,12 +320,16 @@ export default function HomePage() {
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* 入門プラン（なし） */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col relative">
+                <div className="absolute top-4 right-4 bg-gray-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  初年度限定
+                </div>
                 <h3 className="text-xl font-bold text-gray-700 mb-2">入門プラン<br /><span className="text-sm font-normal">（陸連登録なし）</span></h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-3xl font-bold text-gray-800">¥3,000</span>
                   <span className="text-gray-600 ml-1">/年</span>
                 </div>
+                <p className="text-sm text-gray-500 mb-1">一人一回まで</p>
                 <p className="text-xs text-gray-500 mb-4">大会参加料込み</p>
                 <div className="space-y-2 text-sm text-gray-600 mb-8 flex-grow">
                   <p className="flex items-center font-bold">
