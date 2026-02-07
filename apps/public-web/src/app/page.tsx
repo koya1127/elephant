@@ -315,7 +315,7 @@ export default function HomePage() {
             </h3>
             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8 rounded shadow-sm">
               <p className="text-red-700 text-sm font-bold leading-relaxed">
-                ⚠️ こちらのプランは当クラブでの陸連登録代行は行いません。既に個人または他団体で今年度の陸連登録がお済みの方のみご利用いただけます。必ずご自身で登録を済ませてからお申し込みください。
+                ⚠️ こちらのプランは当クラブでの陸連登録代行は行いません。陸連登録はご自身でお願いいたします。
               </p>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
