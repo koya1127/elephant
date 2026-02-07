@@ -215,7 +215,7 @@ export default function HomePage() {
                 </p>
               </div>
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=pp_url&entry.168100395=%E5%8D%98%E7%99%BA%E3%83%AC%E3%83%BC%E3%82%B9%E3%83%97%E3%83%A9%E3%83%B3"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=pp_url&entry.168100395=%E5%8D%98%E7%99%BA%E3%83%97%E3%83%A9%E3%83%B3"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-center bg-gray-700 text-white font-bold py-3 rounded-lg hover:bg-gray-800 transition-colors"
