@@ -189,7 +189,7 @@ export default function HomePage() {
                 </p>
               </div>
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=pp_url&entry.168100395=%E5%85%A5%E9%96%80%E3%83%97%E3%83%A9%E3%83%B3%E2%80%BB%E5%88%9D%E5%B9%B4%E5%BA%A6%E9%99%90%E5%AE%9A"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-center bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-colors"
@@ -215,7 +215,7 @@ export default function HomePage() {
                 </p>
               </div>
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=pp_url&entry.168100395=%E5%8D%98%E7%99%BA%E3%83%AC%E3%83%BC%E3%82%B9%E3%83%97%E3%83%A9%E3%83%B3"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-center bg-gray-700 text-white font-bold py-3 rounded-lg hover:bg-gray-800 transition-colors"
@@ -241,7 +241,7 @@ export default function HomePage() {
                 </p>
               </div>
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=pp_url&entry.168100395=%E3%83%A9%E3%82%A4%E3%83%88%E3%83%97%E3%83%A9%E3%83%B3"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-center bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors"
@@ -267,7 +267,7 @@ export default function HomePage() {
                 </p>
               </div>
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=pp_url&entry.168100395=%E3%82%B9%E3%82%BF%E3%83%B3%E3%83%80%E3%83%BC%E3%83%89%E3%83%97%E3%83%A9%E3%83%B3"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-center bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition-colors"
@@ -293,7 +293,7 @@ export default function HomePage() {
                 </p>
               </div>
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=sf_link"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSduafqq4D5dA6btXfcf9PAYnhKciRcZSDLg4J1HSqWwbqanBQ/viewform?usp=pp_url&entry.168100395=%E3%83%97%E3%83%AC%E3%83%9F%E3%82%A2%E3%83%A0%E3%83%97%E3%83%A9%E3%83%B3"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-center bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition-colors"
