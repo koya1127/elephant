@@ -9,7 +9,8 @@ import path from "path";
 // PDF解析は時間がかかるためタイムアウトを延長
 export const maxDuration = 300; // 5分
 
-const DATA_DIR = path.join(process.cwd(), "data");
+// Vercelではcwd()への書き込み不可 → /tmp を使用
+const DATA_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data");
 const EVENTS_FILE = path.join(DATA_DIR, "events.json");
 
 const PDF_CONCURRENCY = 3; // 同時にPDF解析するリクエスト数
