@@ -158,3 +158,307 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* --- Filter bar --- */
+.filterBar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+/* --- Filter: collapsed summary --- */
+.filterSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.filterSummary:hover {
+  background: #f8fafc;
+}
+
+.filterSummaryLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filterIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  font-size: 16px;
+}
+
+.filterTitleGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.filterTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.filterSubtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 1px;
+}
+
+.filterSummaryRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filterBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.resultCount {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.chevron {
+  font-size: 10px;
+  color: #94a3b8;
+  transition: transform 0.25s;
+}
+
+.chevronOpen {
+  composes: chevron;
+  transform: rotate(180deg);
+}
+
+/* Active filter tags shown when collapsed */
+.activeFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 20px 14px;
+}
+
+.activeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #dbeafe;
+}
+
+.activeTagRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: none;
+  border: none;
+  color: #93c5fd;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+
+.activeTagRemove:hover {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+/* --- Filter: expanded body --- */
+.filterBody {
+  padding: 0 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.filterGroup + .filterGroup {
+  padding-top: 0;
+}
+
+.filterLabel {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  padding-top: 6px;
+  width: 40px;
+  text-align: right;
+}
+
+.filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chip:hover {
+  border-color: #93c5fd;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.chipActive {
+  composes: chip;
+  border-color: #2563eb;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.chipActive:hover {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  border-color: #1d4ed8;
+  color: #fff;
+}
+
+/* --- Close / action buttons at bottom of filter --- */
+.filterActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.clearBtn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 12px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s;
+  font-weight: 500;
+}
+
+.clearBtn:hover {
+  color: #ef4444;
+}
+
+.closeFilterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+}
+
+.closeFilterBtn:hover {
+  opacity: 0.9;
+}
+
+.closeFilterBtn:active {
+  transform: scale(0.97);
+}
+
+@media (max-width: 600px) {
+  .filterBar {
+    border-radius: 0;
+    margin-left: -20px;
+    margin-right: -20px;
+    border-left: none;
+    border-right: none;
+  }
+
+  .filterGroup {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .filterLabel {
+    width: auto;
+    text-align: left;
+    padding-top: 0;
+  }
+
+  .filterChips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .filterChips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chip, .chipActive {
+    flex-shrink: 0;
+  }
+}

@@ -4,13 +4,32 @@ import styles from "./EventCard.module.css";
 
 interface EventCardProps {
   event: Event;
+  /** フィルターで選択中の種目名 */
+  highlightDisciplines?: Set<string>;
+  /** フィルターで選択中のグレード（正規化済み） */
+  highlightGrades?: Set<string>;
+  /** グレード正規化関数 */
+  normalizeGrade?: (raw: string) => string;
 }
 
 const DOW = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({
+  event,
+  highlightDisciplines,
+  highlightGrades,
+  normalizeGrade,
+}: EventCardProps) {
   const { month, day, dow } = parseDate(event.date);
   const dateRange = event.dateEnd ? `〜${parseDate(event.dateEnd).day}日` : "";
+
+  const isDiscHighlighted = (name: string) =>
+    highlightDisciplines && highlightDisciplines.size > 0 && highlightDisciplines.has(name);
+
+  const isGradeHighlighted = (grades: string[]) => {
+    if (!highlightGrades || highlightGrades.size === 0 || !normalizeGrade) return false;
+    return grades.some((g) => highlightGrades.has(normalizeGrade(g)));
+  };
 
   return (
     <article className={styles.card}>
@@ -72,12 +91,23 @@ export function EventCard({ event }: EventCardProps) {
           </div>
           <div className={styles.discGrid}>
             {event.disciplines.map((d, i) => {
-              const grades = normalizeGrades(d.grades);
+              const grades = normalizeGradesArr(d.grades);
+              const discHit = isDiscHighlighted(d.name);
+              const gradeHit = isGradeHighlighted(grades);
+              const bothFiltersActive =
+                highlightDisciplines && highlightDisciplines.size > 0 &&
+                highlightGrades && highlightGrades.size > 0;
+              const hit = bothFiltersActive
+                ? discHit && gradeHit
+                : discHit || gradeHit;
               return (
-                <span key={i} className={styles.discTag}>
+                <span
+                  key={i}
+                  className={hit ? styles.discTagHighlight : styles.discTag}
+                >
                   {String(d.name || "")}
                   {grades.length > 0 && (
-                    <span className={styles.discGrade}>
+                    <span className={hit ? styles.discGradeHighlight : styles.discGrade}>
                       {grades.join(" / ")}
                     </span>
                   )}
@@ -102,7 +132,7 @@ function stringify(val: unknown): string {
   return String(val ?? "");
 }
 
-function normalizeGrades(grades: unknown): string[] {
+function normalizeGradesArr(grades: unknown): string[] {
   if (Array.isArray(grades)) return grades.map((g) => String(g));
   if (grades && typeof grades === "object") return Object.keys(grades);
   return [];
