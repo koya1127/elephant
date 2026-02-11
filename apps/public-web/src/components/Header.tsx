@@ -5,6 +5,7 @@ import { useState } from "react";
 
 const navItems = [
   { href: "/", label: "ホーム" },
+  { href: "/events", label: "大会一覧" },
 ];
 
 export function Header() {
