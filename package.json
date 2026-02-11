@@ -1,0 +1,8 @@
+{
+  "name": "elephant",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter public-web dev",
+    "build": "pnpm --filter public-web build"
+  }
+}
