@@ -1,6 +1,7 @@
 {
   "name": "elephant",
   "private": true,
+  "packageManager": "pnpm@10.28.1",
   "scripts": {
     "dev": "pnpm --filter public-web dev",
     "build": "pnpm --filter public-web build"
