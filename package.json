@@ -1,9 +1,14 @@
 {
   "name": "elephant",
+  "version": "1.0.0",
   "private": true,
-  "packageManager": "pnpm@10.28.1",
   "scripts": {
-    "dev": "pnpm --filter public-web dev",
-    "build": "pnpm --filter public-web build"
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint"
+  },
+  "packageManager": "pnpm@10.23.0",
+  "devDependencies": {
+    "turbo": "^2.7.5"
   }
 }
