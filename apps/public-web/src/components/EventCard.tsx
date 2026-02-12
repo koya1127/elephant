@@ -145,7 +145,10 @@ function parseDate(dateStr: string): { month: number; day: number; dow: number |
   return { month: m, day: d, dow: date.getDay() };
 }
 
-function formatShortDate(dateStr: string): string {
-  const { month, day } = parseDate(dateStr);
-  return `${month}/${day}`;
+function formatShortDate(dateStr: unknown): string {
+  if (typeof dateStr === "string") {
+    const { month, day } = parseDate(dateStr);
+    return `${month}/${day}`;
+  }
+  return stringify(dateStr);
 }
