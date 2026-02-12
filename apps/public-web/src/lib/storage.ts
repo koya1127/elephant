@@ -69,6 +69,7 @@ async function writeToBlob(data: ScrapeResult[]): Promise<void> {
   await put(BLOB_PATH, json, {
     access: "public",
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: "application/json",
   });
 }
