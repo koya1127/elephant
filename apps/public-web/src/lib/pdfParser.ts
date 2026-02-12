@@ -74,5 +74,69 @@ export async function parsePdfWithClaude(
     jsonStr = codeBlockMatch[1].trim();
   }
 
-  return JSON.parse(jsonStr) as PdfParseResult;
+  const raw = JSON.parse(jsonStr);
+  return normalizePdfResult(raw);
+}
+
+/**
+ * Haikuの返すデータ形式のブレを吸収する
+ * - disciplines がオブジェクト（{male:[], female:[]}）→ フラット配列に変換
+ * - maxEntries がオブジェクト → 数値に変換
+ * - entryDeadline がオブジェクト → 文字列に変換
+ */
+function normalizePdfResult(raw: Record<string, unknown>): PdfParseResult {
+  return {
+    location: typeof raw.location === "string" ? raw.location : "",
+    disciplines: normalizeDisciplines(raw.disciplines),
+    maxEntries: normalizeMaxEntries(raw.maxEntries),
+    entryDeadline: normalizeString(raw.entryDeadline),
+    note: normalizeString(raw.note),
+  };
+}
+
+function normalizeDisciplines(val: unknown): Discipline[] {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === "object") {
+    // {male: [...], female: [...]} → フラット配列にマージ
+    const merged = new Map<string, Discipline>();
+    for (const [, arr] of Object.entries(val)) {
+      if (!Array.isArray(arr)) continue;
+      for (const d of arr) {
+        if (!d || typeof d !== "object" || !d.name) continue;
+        const existing = merged.get(d.name);
+        if (existing) {
+          const newGrades = Array.isArray(d.grades) ? d.grades : [];
+          existing.grades = [...new Set([...existing.grades, ...newGrades])];
+        } else {
+          merged.set(d.name, {
+            name: String(d.name),
+            grades: Array.isArray(d.grades) ? d.grades.map(String) : [],
+            ...(d.note ? { note: String(d.note) } : {}),
+          });
+        }
+      }
+    }
+    return Array.from(merged.values());
+  }
+  return [];
+}
+
+function normalizeMaxEntries(val: unknown): number | undefined {
+  if (typeof val === "number") return val;
+  if (val && typeof val === "object" && "individual" in val) {
+    return typeof (val as Record<string, unknown>).individual === "number"
+      ? (val as Record<string, number>).individual
+      : undefined;
+  }
+  return undefined;
+}
+
+function normalizeString(val: unknown): string | undefined {
+  if (typeof val === "string") return val;
+  if (val === null || val === undefined) return undefined;
+  if (typeof val === "object") {
+    const first = Object.values(val).find((v) => typeof v === "string");
+    return typeof first === "string" ? first : JSON.stringify(val);
+  }
+  return String(val);
 }
