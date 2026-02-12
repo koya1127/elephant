@@ -68,7 +68,7 @@ export function EventList() {
       setLoading(true);
       const res = await fetch("/api/scrape");
       const data: ScrapeResult[] = await res.json();
-      const allEvents = data.flatMap((r) => r.events);
+      const allEvents = data.flatMap((r) => r.events).map(sanitizeEvent);
       allEvents.sort((a, b) => a.date.localeCompare(b.date));
       setEvents(allEvents);
       setError(null);
@@ -467,6 +467,20 @@ export function EventList() {
       })}
     </div>
   );
+}
+
+/** Blobに保存済みのデータが想定外の形式でも安全に表示できるよう正規化 */
+function sanitizeEvent(event: Event): Event {
+  let disciplines = event.disciplines;
+  if (!Array.isArray(disciplines)) {
+    // {male:[...], female:[...]} のようなオブジェクト → フラット配列化
+    if (disciplines && typeof disciplines === "object") {
+      disciplines = Object.values(disciplines as Record<string, unknown>).flat() as typeof disciplines;
+    } else {
+      disciplines = [];
+    }
+  }
+  return { ...event, disciplines };
 }
 
 function groupByMonth(events: Event[]): Record<string, Event[]> {
