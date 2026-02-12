@@ -2,16 +2,11 @@ import { NextResponse } from "next/server";
 import { scrapeEvents, downloadPdf } from "@/lib/scraper";
 import { parsePdfWithClaude } from "@/lib/pdfParser";
 import { siteConfigs } from "@/config/sites";
+import { readEvents, writeEvents } from "@/lib/storage";
 import type { Event, ScrapedEventRaw, ScrapeResult } from "@/lib/types";
-import { readFile, writeFile, mkdir } from "fs/promises";
-import path from "path";
 
 // PDF解析は時間がかかるためタイムアウトを延長
 export const maxDuration = 300; // 5分
-
-// Vercelではcwd()への書き込み不可 → /tmp を使用
-const DATA_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data");
-const EVENTS_FILE = path.join(DATA_DIR, "events.json");
 
 const PDF_CONCURRENCY = 3; // 同時にPDF解析するリクエスト数
 
@@ -110,17 +105,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // ファイルに保存
-    await mkdir(DATA_DIR, { recursive: true });
-
     // 既存データを読み込んでマージ
-    let existing: ScrapeResult[] = [];
-    try {
-      const data = await readFile(EVENTS_FILE, "utf-8");
-      existing = JSON.parse(data);
-    } catch {
-      // ファイルが存在しない場合は空配列
-    }
+    const existing = await readEvents();
 
     // 同じsourceIdのデータを更新
     for (const result of allResults) {
@@ -132,7 +118,7 @@ export async function POST(request: Request) {
       }
     }
 
-    await writeFile(EVENTS_FILE, JSON.stringify(existing, null, 2), "utf-8");
+    await writeEvents(existing);
 
     const totalEvents = allResults.reduce(
       (sum, r) => sum + r.events.length,
@@ -159,8 +145,7 @@ export async function POST(request: Request) {
  */
 export async function GET() {
   try {
-    const data = await readFile(EVENTS_FILE, "utf-8");
-    const results: ScrapeResult[] = JSON.parse(data);
+    const results = await readEvents();
     return NextResponse.json(results);
   } catch {
     return NextResponse.json([]);
