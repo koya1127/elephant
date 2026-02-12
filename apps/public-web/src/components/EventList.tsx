@@ -56,7 +56,7 @@ export function EventList() {
   const [showAdmin, setShowAdmin] = useState(false);
 
   // Filter state — default open so users see it immediately
-  const [filterOpen, setFilterOpen] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [selectedGrades, setSelectedGrades] = useState<Set<string>>(new Set());
   const [selectedDisciplines, setSelectedDisciplines] = useState<Set<string>>(
