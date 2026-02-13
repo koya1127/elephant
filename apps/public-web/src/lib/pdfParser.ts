@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import * as XLSX from "xlsx";
 import type { Discipline } from "./types";
 
 const PARSE_PROMPT = `この大会要項PDFから以下の情報をJSON形式で抽出してください。
@@ -139,4 +140,59 @@ function normalizeString(val: unknown): string | undefined {
     return typeof first === "string" ? first : JSON.stringify(val);
   }
   return String(val);
+}
+
+/**
+ * Excelファイルをテキストに変換してClaude APIで解析する
+ */
+export async function parseExcelWithClaude(
+  buffer: Buffer
+): Promise<PdfParseResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not set");
+  }
+
+  // Excelをテキストに変換
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const textParts: string[] = [];
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const csv = XLSX.utils.sheet_to_csv(sheet);
+    if (csv.trim()) {
+      textParts.push(`【シート: ${sheetName}】\n${csv}`);
+    }
+  }
+  const excelText = textParts.join("\n\n");
+
+  if (!excelText.trim()) {
+    return { location: "", disciplines: [] };
+  }
+
+  const client = new Anthropic({ apiKey });
+
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 4096,
+    messages: [
+      {
+        role: "user",
+        content: `以下は大会要項のExcelファイルの内容です。\n\n${excelText}\n\n${PARSE_PROMPT}`,
+      },
+    ],
+  });
+
+  const textBlock = response.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("No text response from Claude API");
+  }
+
+  let jsonStr = textBlock.text.trim();
+  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    jsonStr = codeBlockMatch[1].trim();
+  }
+
+  const raw = JSON.parse(jsonStr);
+  return normalizePdfResult(raw);
 }

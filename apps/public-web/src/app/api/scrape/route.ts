@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { scrapeEvents, downloadPdf } from "@/lib/scraper";
-import { parsePdfWithClaude } from "@/lib/pdfParser";
+import { parsePdfWithClaude, parseExcelWithClaude } from "@/lib/pdfParser";
 import { siteConfigs } from "@/config/sites";
 import { readEvents, writeEvents } from "@/lib/storage";
 import type { Event, ScrapedEventRaw, ScrapeResult } from "@/lib/types";
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
         };
       });
 
-      // PDF解析（並列バッチ処理、差分解析付き）
+      // 要項解析（PDF/Excel対応、並列バッチ処理、差分解析付き）
       let skippedPdfs = 0;
       if (!skipPdf) {
         const pdfTargets = rawEvents
@@ -88,10 +88,10 @@ export async function POST(request: Request) {
           const batch = pdfTargets.slice(i, i + PDF_CONCURRENCY);
           const results = await Promise.allSettled(
             batch.map(async ({ raw, index }) => {
-              const pdfBuffer = await downloadPdf(raw.pdfUrl!);
-              const currentSize = pdfBuffer.length;
+              const fileBuffer = await downloadPdf(raw.pdfUrl!);
+              const currentSize = fileBuffer.length;
 
-              // 既存データとPDFサイズを比較
+              // 既存データとファイルサイズを比較
               const prev = existingMap.get(events[index].id);
               if (
                 prev &&
@@ -100,14 +100,18 @@ export async function POST(request: Request) {
               ) {
                 // サイズ同じ → 前回の解析結果を再利用
                 console.log(
-                  `[PDF] Skipped (unchanged): ${raw.name}`
+                  `[Doc] Skipped (unchanged): ${raw.name}`
                 );
                 return { index, skipped: true as const, prev };
               }
 
               // サイズ違う or 新規 → Claude APIで解析
-              console.log(`[PDF] Parsing: ${raw.name}`);
-              const parsed = await parsePdfWithClaude(pdfBuffer);
+              const url = raw.pdfUrl!.toLowerCase();
+              const isExcel = url.endsWith(".xlsx") || url.endsWith(".xls");
+              console.log(`[Doc] Parsing (${isExcel ? "Excel" : "PDF"}): ${raw.name}`);
+              const parsed = isExcel
+                ? await parseExcelWithClaude(fileBuffer)
+                : await parsePdfWithClaude(fileBuffer);
               return {
                 index,
                 skipped: false as const,
