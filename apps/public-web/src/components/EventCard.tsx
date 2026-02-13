@@ -21,7 +21,7 @@ export function EventCard({
   normalizeGrade,
 }: EventCardProps) {
   const { month, day, dow } = parseDate(event.date);
-  const dateRange = event.dateEnd ? `〜${parseDate(event.dateEnd).day}日` : "";
+  const dateRange = event.dateEnd ? `〜${parseDate(event.dateEnd).day}` : "";
 
   const isDiscHighlighted = (name: string) =>
     highlightDisciplines && highlightDisciplines.size > 0 && highlightDisciplines.has(name);
