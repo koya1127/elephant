@@ -66,7 +66,7 @@ export async function POST(request: Request) {
           ? raw.dateText.split("~")
           : [raw.dateText, undefined];
         return {
-          id: generateId(raw.name, dateStart),
+          id: generateId(raw.name, dateStart, config.id),
           name: raw.name,
           date: dateStart,
           dateEnd,
@@ -205,11 +205,11 @@ export async function GET() {
   }
 }
 
-function generateId(name: string, date: string): string {
+function generateId(name: string, date: string, sourceId: string): string {
   const slug = name
     .replace(/[^\w\u3000-\u9FFF]/g, "")
     .slice(0, 20);
-  return `${date}-${slug}`;
+  return `${sourceId}-${date}-${slug}`;
 }
 
 function extractLocationFromName(name: string): string {

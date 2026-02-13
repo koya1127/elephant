@@ -122,7 +122,8 @@ export function EventList() {
 
       for (const d of event.disciplines) {
         disciplines.add(d.name);
-        for (const g of d.grades) {
+        const grades = Array.isArray(d.grades) ? d.grades : [];
+        for (const g of grades) {
           gradeCategories.add(normalizeGradeCategory(g));
         }
       }
@@ -154,7 +155,7 @@ export function EventList() {
         if (event.disciplines.length === 0) return false;
         const eventGradeCats = new Set(
           event.disciplines.flatMap((d) =>
-            d.grades.map((g) => normalizeGradeCategory(g))
+            (Array.isArray(d.grades) ? d.grades : []).map((g) => normalizeGradeCategory(g))
           )
         );
         const hasMatch = Array.from(selectedGrades).some((g) =>

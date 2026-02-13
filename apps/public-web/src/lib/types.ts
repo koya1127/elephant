@@ -58,7 +58,7 @@ export interface ScrapedEventRaw {
 }
 
 /** サイトのHTMLパーサータイプ */
-export type SiteParserType = "sorachi" | "kushiro";
+export type SiteParserType = "sorachi" | "kushiro" | "douo" | "sapporo" | "hokkaido";
 
 /** サイト定義 */
 export interface SiteConfig {
@@ -74,6 +74,10 @@ export interface SiteConfig {
   encoding?: string;
   /** HTMLパーサータイプ */
   parser: SiteParserType;
+  /** 要項ページURL（札幌用：2段階スクレイピング） */
+  guidelineUrl?: string;
+  /** Cloudflare保護回避のためcurl経由でHTMLを取得する */
+  useCurl?: boolean;
   /** HTMLからイベント一覧を抽出するためのセレクタ設定 */
   selectors: {
     /** イベント行のセレクタ */
