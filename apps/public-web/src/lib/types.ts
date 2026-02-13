@@ -41,6 +41,8 @@ export interface Event {
   entryDeadline?: string;
   /** 備考 */
   note?: string;
+  /** PDFファイルサイズ（バイト数、差分解析用） */
+  pdfSize?: number;
 }
 
 /** スクレイピングで取得した大会の生データ（PDFリンク含む） */
@@ -55,6 +57,9 @@ export interface ScrapedEventRaw {
   detailUrl?: string;
 }
 
+/** サイトのHTMLパーサータイプ */
+export type SiteParserType = "sorachi" | "kushiro";
+
 /** サイト定義 */
 export interface SiteConfig {
   /** サイトID */
@@ -65,6 +70,10 @@ export interface SiteConfig {
   url: string;
   /** ベースURL（相対パス解決用） */
   baseUrl: string;
+  /** 文字エンコーディング（デフォルト: utf-8） */
+  encoding?: string;
+  /** HTMLパーサータイプ */
+  parser: SiteParserType;
   /** HTMLからイベント一覧を抽出するためのセレクタ設定 */
   selectors: {
     /** イベント行のセレクタ */

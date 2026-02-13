@@ -46,8 +46,19 @@ export async function POST(request: Request) {
 
     const allResults: ScrapeResult[] = [];
 
+    // 既存データを先に読み込む（PDF差分解析で使用）
+    const existing = await readEvents();
+
     for (const config of configs) {
       const rawEvents = await scrapeEvents(config);
+
+      // 既存イベントをidでMapに変換（高速検索用）
+      const existingResult = existing.find(
+        (e) => e.sourceId === config.id
+      );
+      const existingMap = new Map(
+        (existingResult?.events || []).map((e) => [e.id, e])
+      );
 
       // 基本イベント情報を先に作成
       const events: Event[] = rawEvents.map((raw) => {
@@ -66,7 +77,8 @@ export async function POST(request: Request) {
         };
       });
 
-      // PDF解析（並列バッチ処理）
+      // PDF解析（並列バッチ処理、差分解析付き）
+      let skippedPdfs = 0;
       if (!skipPdf) {
         const pdfTargets = rawEvents
           .map((raw, i) => ({ raw, index: i }))
@@ -76,21 +88,60 @@ export async function POST(request: Request) {
           const batch = pdfTargets.slice(i, i + PDF_CONCURRENCY);
           const results = await Promise.allSettled(
             batch.map(async ({ raw, index }) => {
-              console.log(`[PDF] Parsing: ${raw.name}`);
               const pdfBuffer = await downloadPdf(raw.pdfUrl!);
+              const currentSize = pdfBuffer.length;
+
+              // 既存データとPDFサイズを比較
+              const prev = existingMap.get(events[index].id);
+              if (
+                prev &&
+                prev.pdfSize != null &&
+                prev.pdfSize === currentSize
+              ) {
+                // サイズ同じ → 前回の解析結果を再利用
+                console.log(
+                  `[PDF] Skipped (unchanged): ${raw.name}`
+                );
+                return { index, skipped: true as const, prev };
+              }
+
+              // サイズ違う or 新規 → Claude APIで解析
+              console.log(`[PDF] Parsing: ${raw.name}`);
               const parsed = await parsePdfWithClaude(pdfBuffer);
-              return { index, parsed };
+              return {
+                index,
+                skipped: false as const,
+                parsed,
+                pdfSize: currentSize,
+              };
             })
           );
 
           for (const result of results) {
             if (result.status === "fulfilled") {
-              const { index, parsed } = result.value;
-              if (parsed.location) events[index].location = parsed.location;
-              events[index].disciplines = parsed.disciplines || [];
-              events[index].maxEntries = parsed.maxEntries;
-              events[index].entryDeadline = parsed.entryDeadline;
-              events[index].note = parsed.note;
+              const val = result.value;
+              if (val.skipped) {
+                // 前回の解析結果をコピー
+                const { prev } = val;
+                events[val.index].disciplines = prev.disciplines;
+                events[val.index].maxEntries = prev.maxEntries;
+                events[val.index].entryDeadline = prev.entryDeadline;
+                events[val.index].note = prev.note;
+                events[val.index].pdfSize = prev.pdfSize;
+                if (prev.location)
+                  events[val.index].location = prev.location;
+                skippedPdfs++;
+              } else {
+                const { index, parsed, pdfSize } = val;
+                if (parsed.location)
+                  events[index].location = parsed.location;
+                events[index].disciplines =
+                  parsed.disciplines || [];
+                events[index].maxEntries = parsed.maxEntries;
+                events[index].entryDeadline = parsed.entryDeadline;
+                events[index].note = parsed.note;
+                events[index].pdfSize = pdfSize;
+              }
             } else {
               console.error(`[PDF] Error:`, result.reason);
             }
@@ -102,11 +153,9 @@ export async function POST(request: Request) {
         sourceId: config.id,
         scrapedAt: new Date().toISOString(),
         events,
-      });
+        skippedPdfs,
+      } as ScrapeResult & { skippedPdfs: number });
     }
-
-    // 既存データを読み込んでマージ
-    const existing = await readEvents();
 
     // 同じsourceIdのデータを更新
     for (const result of allResults) {
@@ -124,10 +173,14 @@ export async function POST(request: Request) {
       (sum, r) => sum + r.events.length,
       0
     );
+    const totalSkipped = allResults.reduce(
+      (sum, r) => sum + ((r as ScrapeResult & { skippedPdfs: number }).skippedPdfs || 0),
+      0
+    );
 
     return NextResponse.json({
       success: true,
-      message: `${totalEvents} events scraped from ${configs.length} site(s)`,
+      message: `${totalEvents} events scraped from ${configs.length} site(s), ${totalSkipped} PDFs skipped (unchanged)`,
       results: allResults,
     });
   } catch (err) {
