@@ -688,6 +688,9 @@ async function parseHokkaido(html: string, config: SiteConfig): Promise<ScrapedE
         const pdfBuffer = await downloadPdf(pdfUrl);
         // pdf-parseを動的インポート（サーバーサイドのみ）
         // index.jsのデバッグコード回避のためlib/pdf-parse.jsを直接require
+        // ES Module環境(tsxなど)でも動作するようにcreateRequireを使用
+        const { createRequire } = await import("module");
+        const require = createRequire(import.meta.url);
         const pdfParse = require("pdf-parse/lib/pdf-parse.js");
         const data = await pdfParse(pdfBuffer);
         const pdfEvents = parseHokkaidoPdfText(data.text, config, pdfUrl);
