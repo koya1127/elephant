@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter public-web dev:*)",
+      "Bash(timeout:*)",
+      "Bash(pnpm --filter public-web build:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}

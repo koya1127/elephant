@@ -65,7 +65,7 @@ export default function HomePage() {
               </p>
             </div>
           </div>
-          
+
           <div className="mt-12 text-center">
             <div className="inline-block bg-gray-800 text-white px-8 py-4 rounded-full text-lg font-bold">
               その煩わしい事務手続き、私たちがすべて代行します。
@@ -153,7 +153,7 @@ export default function HomePage() {
         {/* Pricing Plans */}
         <section className="mb-16">
           <h2 className="text-2xl font-bold mb-4 text-gray-800 text-center">料金プラン</h2>
-          
+
           {/* Fee Inclusion Highlight */}
           <div className="max-w-4xl mx-auto mb-8 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl p-6 shadow-md text-center border-4 border-orange-300">
             <h3 className="text-xl md:text-2xl font-bold mb-3">📢 すべて「大会参加料」＆「陸連登録料」込み！</h3>
@@ -281,7 +281,7 @@ export default function HomePage() {
               </div>
 
               {/* プレミアムプラン */}
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-6 shadow-lg md:col-span-2 lg:col-span-1 flex flex-col">
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-6 shadow-lg lg:col-span-1 flex flex-col">
                 <h3 className="text-2xl font-bold text-purple-700 mb-2">プレミアムプラン</h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-4xl font-bold text-gray-800">¥200,000</span>
@@ -428,7 +428,7 @@ export default function HomePage() {
               </div>
 
               {/* プレミアムプラン（なし） */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col md:col-span-2 lg:col-span-1">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col lg:col-span-1">
                 <h3 className="text-xl font-bold text-gray-700 mb-2">プレミアムプラン<br /><span className="text-sm font-normal">（陸連登録なし）</span></h3>
                 <div className="flex items-baseline mb-1">
                   <span className="text-3xl font-bold text-gray-800">¥190,000</span>
@@ -459,7 +459,7 @@ export default function HomePage() {
           <div className="max-w-3xl mx-auto mb-16">
             <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-6 shadow-md">
               <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">追加オプション</h3>
-              
+
               <div className="flex items-center justify-between border-b pb-4 mb-4">
                 <div className="flex-1">
                   <p className="text-xl font-bold text-gray-800">1大会追加</p>

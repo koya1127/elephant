@@ -62,6 +62,7 @@ export function EventList() {
   const [selectedDisciplines, setSelectedDisciplines] = useState<Set<string>>(
     new Set()
   );
+  const [showPastEvents, setShowPastEvents] = useState(false);
 
   const fetchEvents = async () => {
     try {
@@ -132,14 +133,155 @@ export function EventList() {
     const sortedMonths = Array.from(months).sort();
     const gradeOrder = ["一般", "高校", "中学", "小学生", "マスターズ"];
     const sortedGrades = gradeOrder.filter((g) => gradeCategories.has(g));
+
+    // Sort disciplines first
     const sortedDisciplines = Array.from(disciplines).sort((a, b) => {
       return disciplineSortKey(a) - disciplineSortKey(b);
     });
 
+    // Group disciplines
+    const groups: Record<string, string[]> = {
+      "短距離": [],
+      "中距離": [],
+      "長距離": [],
+      "ハードル": [],
+      "跳躍": [],
+      "投擲": [],
+      "混成": [],
+      "リレー": [],
+      "競歩": [],
+      "マラソン・ロード": [],
+      "駅伝": [],
+      "その他": [],
+    };
+
+    /**
+     * Normalize discipline name for categorization (remove gender, grade, school type prefixes)
+     * e.g. "小100m" -> "100m", "女子800m" -> "800m", "中2-100m" -> "100m"
+     */
+    const normalizeDiscipline = (name: string): string => {
+      let n = name;
+
+      // Normalize full-width characters (numbers and 'm', 'H', 'W', 'R')
+      n = n.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
+      n = n.replace(/[Ａ-Ｚａ-ｚ]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
+
+      // Explicitly replace full-width chars that might be missed or specific units
+      n = n.replace(/ｍ/g, "m");
+      n = n.replace(/Ｈ/g, "H");
+      n = n.replace(/Ｗ/g, "W");
+      n = n.replace(/Ｒ/g, "R");
+
+      // Remove common prefixes/suffixes
+      n = n.replace(/^(男子|女子|混合|男女)/, "");
+      n = n.replace(/^(小学|中学|高校|一般|共通|小|中|高|大|マス|壮年)/, "");
+      n = n.replace(/^(\d+年)/, ""); // e.g. "1年", "2年"
+      n = n.replace(/-/, ""); // "中2-100m" -> "2100m"? No, usually "中2-100m" -> "100m". 
+      // Better regex for "中2-100m" -> remove "中2-"
+      n = n.replace(/^[小中高](\d+)[-]?/, "");
+      n = n.replace(/^[小中高]/, ""); // Catch remaining single char
+      n = n.replace(/\(.*\)/, ""); // Remove anything in parens e.g. (8.0m)
+      // Remove spaces
+      n = n.trim();
+      return n;
+    };
+
+    for (const d of sortedDisciplines) {
+      const norm = normalizeDiscipline(d);
+
+      // Hurdles (Check original name for "H" to be safe, but norm is good for distance)
+      // "80mH", "100mH", "110mH", "400mH", "110mYH"
+      if (/H$|H\d|ハードル|SC|障害/.test(d)) {
+        // SC (Steeplechase) is distinct? usually Track. 
+        // User complained about Hurdles in Other. 
+        // Let's put SC in "長距離" or "中距離" or separate? 
+        // Usually SC is 3000mSC -> Long. But "Hardle" category specifically requested.
+        // Let's put standard Hurdles in "Hardle". 
+        if (/SC|障害/.test(d)) {
+          // 3000mSC is technical, often grouped with Long or separate. 
+          // Let's put in "長距離" for now unless "Hurdle" is strictly "Hurdle".
+          // Actually user said "Hurdles also entered (in Other)".
+          if (/SC/.test(d)) groups["長距離"].push(d); // 3000mSC -> Long
+          else groups["ハードル"].push(d);
+        } else {
+          groups["ハードル"].push(d);
+        }
+        continue;
+      }
+
+      // Sprints: 100m, 200m, 400m, 50m, 60m, 80m
+      // Check normalized name for simple distance
+      // Allow "100" (implicit m) or "100m"
+      const distMatch = norm.match(/^(\d+)m?$/);
+      if (distMatch) {
+        const dist = Number(distMatch[1]);
+        if (dist <= 400) {
+          groups["短距離"].push(d);
+        } else if (dist <= 1500) { // 800, 1000, 1500
+          groups["中距離"].push(d);
+        } else { // 3000, 5000, 10000+
+          groups["長距離"].push(d);
+        }
+        continue;
+      }
+
+      // Relays
+      if (/リレー|R$/.test(d)) {
+        groups["リレー"].push(d);
+        continue;
+      }
+
+      // Walks
+      if (/競歩|W$/.test(d)) {
+        groups["競歩"].push(d);
+        continue;
+      }
+
+      // Road / Marathon
+      if (/マラソン|ロード|クロカン/.test(d)) {
+        groups["マラソン・ロード"].push(d);
+        continue;
+      }
+
+      // Ekiden
+      if (/駅伝/.test(d)) {
+        groups["駅伝"].push(d);
+        continue;
+      }
+
+      // Field: Jumps
+      if (/走高|棒高|走幅|三段|跳/.test(d)) {
+        groups["跳躍"].push(d);
+        continue;
+      }
+
+      // Field: Throws (including Javelin Ball/Vortex)
+      if (/砲丸|円盤|ハンマー|やり|投|ジャベリ|ボール/.test(d)) {
+        groups["投擲"].push(d);
+        continue;
+      }
+
+      // Combined
+      if (/混成|種|コンバインド|トライアスロン/.test(d)) {
+        // "四種競技" -> "種"?
+        groups["混成"].push(d);
+        continue;
+      }
+
+      // Fallback
+      groups["その他"].push(d);
+    }
+
+    // Convert to array of { category, items } for easy rendering, removing empty groups
+    const disciplineGroups = Object.entries(groups)
+      .map(([category, items]) => ({ category, items }))
+      .filter((g) => g.items.length > 0);
+
     return {
       months: sortedMonths,
       grades: sortedGrades,
-      disciplines: sortedDisciplines,
+      disciplines: sortedDisciplines, // Keep flat list check logic if needed, or remove if unused in favor of groups
+      disciplineGroups,
     };
   }, [events]);
 
@@ -149,6 +291,14 @@ export function EventList() {
       if (selectedMonths.size > 0) {
         const [y, m] = event.date.split("-");
         if (!selectedMonths.has(`${y}-${m}`)) return false;
+      }
+
+      // Filter past events defaults
+      if (!showPastEvents) {
+        const eventDate = new Date(event.date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (eventDate < today) return false;
       }
 
       if (selectedGrades.size > 0) {
@@ -235,7 +385,7 @@ export function EventList() {
   const eventsByMonth = groupByMonth(filteredEvents);
 
   return (
-    <div>
+    <div className={styles.cardListFade}>
       {/* 管理者パネル（トグル式） */}
       <div className={styles.adminToggle}>
         <button
@@ -338,34 +488,61 @@ export function EventList() {
           {/* Filter body (expanded) */}
           {filterOpen && (
             <div className={styles.filterBody}>
+              {/* Top actions (Close button) */}
+              <div className={styles.filterHeader}>
+                <span className={styles.filterHeaderTitle}>絞り込み条件</span>
+                <button
+                  className={styles.closeFilterBtn}
+                  onClick={() => setFilterOpen(false)}
+                >
+                  閉じる &times;
+                </button>
+              </div>
+
               {/* Month filter */}
               {filterOptions.months.length > 0 && (
-                <div className={styles.filterGroup}>
-                  <span className={styles.filterLabel}>月</span>
+                <details className={styles.filterGroup} open>
+                  <summary className={styles.filterLabel}>開催月</summary>
                   <div className={styles.filterChips}>
-                    {filterOptions.months.map((m) => (
-                      <button
-                        key={m}
-                        className={
-                          selectedMonths.has(m)
-                            ? styles.chipActive
-                            : styles.chip
-                        }
-                        onClick={() =>
-                          toggleFilter(selectedMonths, setSelectedMonths, m)
-                        }
-                      >
-                        {formatMonth(m)}
-                      </button>
-                    ))}
+                    {filterOptions.months.map((m) => {
+                      const [y, mon] = m.split("-");
+                      const isPast = new Date(m + "-01") < new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                      if (!showPastEvents && isPast) return null; // Skip past months if toggle off
+
+                      return (
+                        <button
+                          key={m}
+                          className={
+                            selectedMonths.has(m)
+                              ? styles.chipActive
+                              : styles.chip
+                          }
+                          onClick={() =>
+                            toggleFilter(selectedMonths, setSelectedMonths, m)
+                          }
+                        >
+                          {y}年{parseInt(mon)}月
+                        </button>
+                      )
+                    })}
                   </div>
-                </div>
+                  <div className={styles.pastToggle}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={showPastEvents}
+                        onChange={(e) => setShowPastEvents(e.target.checked)}
+                      />
+                      過去の大会を表示する
+                    </label>
+                  </div>
+                </details>
               )}
 
               {/* Grade filter */}
               {filterOptions.grades.length > 0 && (
-                <div className={styles.filterGroup}>
-                  <span className={styles.filterLabel}>対象</span>
+                <details className={styles.filterGroup} open>
+                  <summary className={styles.filterLabel}>対象</summary>
                   <div className={styles.filterChips}>
                     {filterOptions.grades.map((g) => (
                       <button
@@ -383,35 +560,45 @@ export function EventList() {
                       </button>
                     ))}
                   </div>
-                </div>
+                </details>
               )}
 
-              {/* Discipline filter */}
+              {/* Discipline filter (Categorized) */}
               {filterOptions.disciplines.length > 0 && (
-                <div className={styles.filterGroup}>
-                  <span className={styles.filterLabel}>種目</span>
-                  <div className={styles.filterChips}>
-                    {filterOptions.disciplines.map((d) => (
-                      <button
-                        key={d}
-                        className={
-                          selectedDisciplines.has(d)
-                            ? styles.chipActive
-                            : styles.chip
-                        }
-                        onClick={() =>
-                          toggleFilter(
-                            selectedDisciplines,
-                            setSelectedDisciplines,
-                            d
-                          )
-                        }
-                      >
-                        {d}
-                      </button>
-                    ))}
+                <details className={styles.filterGroup} open>
+                  <summary className={styles.filterLabel}>種目</summary>
+                  <div className={styles.disciplineList}>
+                    {filterOptions.disciplineGroups.map((group) => {
+                      const hasActiveItem = group.items.some(d => selectedDisciplines.has(d));
+                      return (
+                        <details key={group.category} className={styles.disciplineCategory} open={hasActiveItem}>
+                          <summary className={styles.categoryLabel}>{group.category}</summary>
+                          <div className={styles.filterChips}>
+                            {group.items.map((d) => (
+                              <button
+                                key={d}
+                                className={
+                                  selectedDisciplines.has(d)
+                                    ? styles.chipActive
+                                    : styles.chip
+                                }
+                                onClick={() =>
+                                  toggleFilter(
+                                    selectedDisciplines,
+                                    setSelectedDisciplines,
+                                    d
+                                  )
+                                }
+                              >
+                                {d}
+                              </button>
+                            ))}
+                          </div>
+                        </details>
+                      )
+                    })}
                   </div>
-                </div>
+                </details>
               )}
 
               {/* Bottom actions */}
@@ -438,35 +625,41 @@ export function EventList() {
         </div>
       )}
 
-      {!loading && events.length === 0 && (
-        <div className={styles.empty}>大会データがありません。</div>
-      )}
+      {
+        !loading && events.length === 0 && (
+          <div className={styles.empty}>大会データがありません。</div>
+        )
+      }
 
-      {!loading && hasActiveFilters && filteredEvents.length === 0 && (
-        <div className={styles.empty}>条件に一致する大会がありません。</div>
-      )}
+      {
+        !loading && hasActiveFilters && filteredEvents.length === 0 && (
+          <div className={styles.empty}>条件に一致する大会がありません。</div>
+        )
+      }
 
-      {Object.entries(eventsByMonth).map(([month, monthEvents]) => {
-        const monthNum = month.replace(/[^0-9]/g, "").slice(-2);
-        return (
-          <section key={month} className={styles.monthSection}>
-            <div className={styles.monthHeader}>
-              <div className={styles.monthNumber}>{parseInt(monthNum)}</div>
-              <span className={styles.monthLabel}>{month}</span>
-            </div>
-            {monthEvents.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                highlightDisciplines={selectedDisciplines}
-                highlightGrades={selectedGrades}
-                normalizeGrade={normalizeGradeCategory}
-              />
-            ))}
-          </section>
-        );
-      })}
-    </div>
+      {
+        Object.entries(eventsByMonth).map(([month, monthEvents]) => {
+          const monthNum = month.replace(/[^0-9]/g, "").slice(-2);
+          return (
+            <section key={month} className={styles.monthSection}>
+              <div className={styles.monthHeader}>
+                <div className={styles.monthNumber}>{parseInt(monthNum)}</div>
+                <span className={styles.monthLabel}>{month}</span>
+              </div>
+              {monthEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  highlightDisciplines={selectedDisciplines}
+                  highlightGrades={selectedGrades}
+                  normalizeGrade={normalizeGradeCategory}
+                />
+              ))}
+            </section>
+          );
+        })
+      }
+    </div >
   );
 }
 

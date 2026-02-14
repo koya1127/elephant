@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Event } from "@/lib/types";
 import { EntryButton } from "./EntryButton";
 import styles from "./EventCard.module.css";
@@ -20,6 +21,7 @@ export function EventCard({
   highlightGrades,
   normalizeGrade,
 }: EventCardProps) {
+  const [showAllTags, setShowAllTags] = useState(false);
   const { month, day, dow } = parseDate(event.date);
   const dateRange = event.dateEnd ? `〜${parseDate(event.dateEnd).day}` : "";
 
@@ -90,7 +92,7 @@ export function EventCard({
             種目（{event.disciplines.length}種目）
           </div>
           <div className={styles.discGrid}>
-            {event.disciplines.map((d, i) => {
+            {event.disciplines.slice(0, showAllTags ? undefined : 10).map((d, i) => {
               const grades = normalizeGradesArr(d.grades);
               const discHit = isDiscHighlighted(d.name);
               const gradeHit = isGradeHighlighted(grades);
@@ -114,6 +116,15 @@ export function EventCard({
                 </span>
               );
             })}
+            {!showAllTags && event.disciplines.length > 10 && (
+              <button
+                onClick={() => setShowAllTags(true)}
+                className={styles.discTag}
+                style={{ cursor: "pointer", background: "#f1f5f9", color: "#64748b" }}
+              >
+                + 他{event.disciplines.length - 10}件
+              </button>
+            )}
           </div>
           {event.note && (
             <div className={styles.note}>{stringify(event.note)}</div>
