@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { execSync } from "child_process";
+import { parseSchedulePdfWithClaude } from "./pdfParser";
 import type { SiteConfig, ScrapedEventRaw } from "./types";
 
 /**
@@ -11,672 +12,498 @@ export async function scrapeEvents(
   const html = config.useCurl
     ? fetchHtmlWithCurl(config.url)
     : await fetchHtml(config.url, config.encoding);
+
   // 札幌は要項ページも取得して2段階でパース
   if (config.parser === "sapporo" && config.guidelineUrl) {
     const guidelineHtml = await fetchHtml(config.guidelineUrl);
     return parseSapporo(html, guidelineHtml, config);
   }
+
+  // 高体連: ページからスケジュールPDFを見つけてClaude APIで解析
+  if (config.parser === "koutairen") {
+    return parseKoutairen(html, config);
+  }
+
+  // マスターズ: schedule.php + news.phpの2段階
+  if (config.parser === "masters") {
+    return parseMasters(html, config);
+  }
+
+  // ランネット: 複数ページ取得
+  if (config.parser === "runnet") {
+    return parseRunnet(html, config);
+  }
+
   return await parseEventsFromHtml(html, config);
 }
 
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
-/**
- * curl経由でHTMLを取得（Cloudflare保護回避用）
- */
-function fetchHtmlWithCurl(url: string): string {
-  return execSync(
-    `curl -s -L -A "${USER_AGENT}" "${url}"`,
-    { maxBuffer: 10 * 1024 * 1024, encoding: "utf-8" }
-  );
-}
-
-/**
- * HTMLを取得（エンコーディング対応）
- */
-async function fetchHtml(url: string, encoding?: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT },
-  });
+async function fetchHtml(
+  url: string,
+  encoding: string = "utf-8"
+): Promise<string> {
+  const res = await fetch(url);
   const buffer = await res.arrayBuffer();
-  const decoder = new TextDecoder(encoding || "utf-8");
+  const decoder = new TextDecoder(encoding);
   return decoder.decode(buffer);
 }
 
-/**
- * パーサータイプに応じてHTMLからイベント一覧を抽出
- */
+function fetchHtmlWithCurl(url: string): string {
+  try {
+    // 403回避のための簡易策 (User-Agent偽装)
+    const cmd = `curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "${url}"`;
+    return execSync(cmd).toString();
+  } catch (e) {
+    console.error(`Curl failed for ${url}:`, e);
+    return "";
+  }
+}
+
+export async function downloadPdf(url: string): Promise<Buffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download PDF: ${res.statusText}`);
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
 async function parseEventsFromHtml(
   html: string,
   config: SiteConfig
 ): Promise<ScrapedEventRaw[]> {
-  switch (config.parser) {
-    case "sorachi":
-      return parseSorachi(html, config);
-    case "kushiro":
-      return parseKushiro(html, config);
-    case "douo":
-      return parseDouo(html, config);
-    case "hokkaido":
-      return parseHokkaido(html, config);
-    case "sapporo":
-      // 通常はscrapeEvents()で直接呼ばれるためここには来ない
-      throw new Error("Sapporo parser requires guidelineHtml - use scrapeEvents()");
-    default:
-      throw new Error(`Unknown parser type: ${config.parser}`);
+  const events: ScrapedEventRaw[] = [];
+
+  // 北海道陸協はPDFパースロジックを含むため特別扱い
+  if (config.parser === "hokkaido") {
+    return parseHokkaido(html, config);
   }
-}
 
-/**
- * URLから年を推定する（例: /event/2025/ → 2025）
- * 見つからなければ現在の年を返す
- */
-function detectYear(url: string): string {
-  const match = url.match(/\/(\d{4})\//);
-  return match ? match[1] : new Date().getFullYear().toString();
-}
-
-/**
- * PDFリンクを抽出するヘルパー
- */
-function extractPdfLinks(pdfHtml: string, baseUrl: string): string[] {
-  const pdfLinks: string[] = [];
-  const $ = cheerio.load(pdfHtml);
-  $("a").each((_k, a) => {
-    const href = $(a).attr("href");
-    if (href && href.endsWith(".pdf")) {
-      const absoluteUrl = href.startsWith("http")
-        ? href
-        : new URL(href, baseUrl).toString();
-      pdfLinks.push(absoluteUrl);
-    }
-  });
-  return pdfLinks;
-}
-
-// ──────────────────────────────────────────
-// 空知陸協パーサー
-// テーブル構造:
-//   列0: 月（rowspan で複数行にまたがる）
-//   列1: 日
-//   列2: 曜日
-//   列3: 大会名
-//   列4: 大会要項（PDFリンク）
-//   列5: 参加申込書
-// ──────────────────────────────────────────
-function parseSorachi(html: string, config: SiteConfig): ScrapedEventRaw[] {
   const $ = cheerio.load(html);
-  const events: ScrapedEventRaw[] = [];
-  const rows = $("table tr");
-  const year = detectYear(config.url);
 
-  let currentMonth = "";
+  if (config.parser === "sorachi") {
+    // 空知: テーブル形式
+    $(config.selectors.eventRow).each((_, el) => {
+      const tds = $(el).find("td");
+      if (tds.length === 0) return;
 
-  rows.each((_i, row) => {
-    const cells = $(row).find("td");
-    if (cells.length === 0) return;
-
-    const cellTexts: { text: string; html: string }[] = [];
-    cells.each((_j, cell) => {
-      cellTexts.push({
-        text: $(cell).text().trim(),
-        html: $(cell).html() || "",
-      });
-    });
-
-    // 列数で月カラムの有無を判定
-    // 6列 = 月あり、5列 = 月なし（前の月を引き継ぎ）
-    let day: string;
-    let eventName: string;
-    let pdfHtml: string;
-
-    if (cellTexts.length >= 6) {
-      const monthText = cellTexts[0].text.replace(/\s/g, "");
-      if (monthText && /^\d+$/.test(monthText)) {
-        currentMonth = monthText;
-      }
-      day = cellTexts[1].text.replace(/\s/g, "");
-      eventName = cellTexts[3].text.replace(/\s+/g, " ").trim();
-      pdfHtml = cellTexts[4].html;
-    } else if (cellTexts.length >= 5) {
-      day = cellTexts[0].text.replace(/\s/g, "");
-      eventName = cellTexts[2].text.replace(/\s+/g, " ").trim();
-      pdfHtml = cellTexts[3].html;
-    } else {
-      return;
-    }
-
-    if (!currentMonth || !day || !/\d/.test(day)) return;
-    if (eventName === "大会名" || eventName === "") return;
-
-    const pdfLinks = extractPdfLinks(pdfHtml, config.baseUrl);
-
-    // 日付範囲の処理（例: "20〜22" → "20"）
-    const dayMatch = day.match(/(\d+)/);
-    const dayNum = dayMatch ? dayMatch[1] : day;
-    const dayEndMatch = day.match(/[〜~ー](\d+)/);
-
-    const dateText = `${year}-${currentMonth.padStart(2, "0")}-${dayNum.padStart(2, "0")}`;
-    const dateEndText = dayEndMatch
-      ? `${year}-${currentMonth.padStart(2, "0")}-${dayEndMatch[1].padStart(2, "0")}`
-      : undefined;
-
-    events.push({
-      name: eventName,
-      dateText: dateEndText ? `${dateText}~${dateEndText}` : dateText,
-      pdfUrl: pdfLinks[0],
-      detailUrl: pdfLinks[0] || config.url,
-    });
-  });
-
-  return events;
-}
-
-// ──────────────────────────────────────────
-// 釧路地方陸協パーサー
-// テーブル構造（4列）:
-//   列0: 日付 <th>（例: ４月2６日（土）, ５月２２日（木）～\n24日（土））
-//   列1: 大会名 <td>
-//   列2: 要項PDF <td>（div.sp-button内のリンク）
-//   列3: 日程関係 <td>（タイムテーブル等）
-// ──────────────────────────────────────────
-function parseKushiro(html: string, config: SiteConfig): ScrapedEventRaw[] {
-  const $ = cheerio.load(html);
-  const events: ScrapedEventRaw[] = [];
-  const rows = $(config.selectors.eventRow);
-
-  // URLから年を推定（r7 = 令和7年 = 2025）
-  const year = detectYearFromKushiroUrl(config.url);
-
-  rows.each((_i, row) => {
-    // 日付は<th>に入っている
-    const dateTh = $(row).find("th.col-title").first();
-    const cells = $(row).find("td");
-    if (!dateTh.length || cells.length < 1) return;
-
-    const dateCell = dateTh.text().trim();
-    const eventName = $(cells[0]).text().replace(/\s+/g, " ").trim();
-    // 要項列（2列目のtd = index 1）のHTMLからPDFリンクを抽出
-    const pdfHtml = cells.length >= 2 ? $(cells[1]).html() || "" : "";
-
-    if (!dateCell || !eventName) return;
-
-    // 日本語日付をパース（例: ４月2６日（土）→ 2025-04-26）
-    const parsed = parseJapaneseDate(dateCell, year);
-    if (!parsed) return;
-
-    const pdfLinks = extractPdfLinks(pdfHtml, config.baseUrl);
-
-    events.push({
-      name: eventName,
-      dateText: parsed.dateEnd
-        ? `${parsed.dateStart}~${parsed.dateEnd}`
-        : parsed.dateStart,
-      pdfUrl: pdfLinks[0],
-      detailUrl: pdfLinks[0] || config.url,
-    });
-  });
-
-  return events;
-}
-
-/**
- * 釧路サイトのURLから年を推定
- * r7 = 令和7年 = 2025, r8 = 2026, etc.
- */
-function detectYearFromKushiroUrl(url: string): string {
-  const match = url.match(/r(\d+)/i);
-  if (match) {
-    const reiwa = parseInt(match[1], 10);
-    return (2018 + reiwa).toString(); // 令和1年 = 2019, 基準は2018
-  }
-  return new Date().getFullYear().toString();
-}
-
-/**
- * 日本語日付文字列をパース
- * 全角数字・半角数字混在に対応
- * 例: "４月2６日（土）" → { dateStart: "2025-04-26" }
- * 例: "5月22日（木）～24日（土）" → { dateStart: "2025-05-22", dateEnd: "2025-05-24" }
- */
-function parseJapaneseDate(
-  text: string,
-  year: string
-): { dateStart: string; dateEnd?: string } | null {
-  // 全角数字を半角に変換
-  const normalized = text.replace(/[０-９]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0xfee0)
-  );
-
-  // 月と日を抽出
-  const mainMatch = normalized.match(/(\d{1,2})月\s*(\d{1,2})日/);
-  if (!mainMatch) return null;
-
-  const month = mainMatch[1].padStart(2, "0");
-  const day = mainMatch[2].padStart(2, "0");
-  const dateStart = `${year}-${month}-${day}`;
-
-  // 範囲の終了日を抽出（～24日 or 〜24日）
-  const rangeMatch = normalized.match(/[～〜~]\s*(\d{1,2})日/);
-  if (rangeMatch) {
-    const dayEnd = rangeMatch[1].padStart(2, "0");
-    return { dateStart, dateEnd: `${year}-${month}-${dayEnd}` };
-  }
-
-  return { dateStart };
-}
-
-// ──────────────────────────────────────────
-// 道央陸協パーサー（Jimdoサイト）
-// window.__WEBSITE_PROPS__ JSON内のブロックデータを解析
-// ブロック形式:
-//   - List: content.items.items[0].content.{text0, text1, primaryCTA, secondaryCTA}
-//   - Columns: content.text.data.text（タイトル+日付）, content.columns.items[].content.primaryCTA
-// ──────────────────────────────────────────
-function parseDouo(html: string, config: SiteConfig): ScrapedEventRaw[] {
-  // __WEBSITE_PROPS__ のJSONを抽出（ブレース数でバランスをとる）
-  const marker = "window.__WEBSITE_PROPS__ = ";
-  const startIdx = html.indexOf(marker);
-  if (startIdx === -1) {
-    console.error("[Douo] __WEBSITE_PROPS__ not found");
-    return [];
-  }
-
-  const jsonStart = startIdx + marker.length;
-  let depth = 0;
-  let jsonEnd = jsonStart;
-  for (let i = jsonStart; i < html.length; i++) {
-    if (html[i] === "{") depth++;
-    else if (html[i] === "}") depth--;
-    if (depth === 0) {
-      jsonEnd = i + 1;
-      break;
-    }
-  }
-
-  let data: Record<string, unknown>;
-  try {
-    data = JSON.parse(html.slice(jsonStart, jsonEnd));
-  } catch {
-    console.error("[Douo] Failed to parse JSON");
-    return [];
-  }
-
-  const fileLinkMap = (data.fileLinkMap || {}) as Record<
-    string,
-    { download_url?: string; cdn_url?: string; title?: string }
-  >;
-  const pageData = data.pageData as
-    | { blocks?: Record<string, unknown>[] }
-    | undefined;
-  const blocks = pageData?.blocks || [];
-  const events: ScrapedEventRaw[] = [];
-
-  const resolveFileUrl = (uuid: string): string | undefined => {
-    const file = fileLinkMap[uuid];
-    return file?.download_url || file?.cdn_url;
-  };
-
-  const stripHtmlTags = (html: string): string =>
-    html.replace(/<[^>]+>/g, "").trim();
-
-  const extractEventName = (htmlText: string): string => {
-    // h1, h2, h3タグ内のテキストを抽出
-    const headingMatch = htmlText.match(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/g);
-    if (headingMatch) {
-      return headingMatch
-        .map((h) => stripHtmlTags(h))
-        .filter(Boolean)
-        .join(" ")
-        .replace(/【終了】\s*/, "")
+      const dateText = $(tds[config.selectors.dateColumn as number])
+        .text()
         .trim();
-    }
-    return stripHtmlTags(htmlText).replace(/【終了】\s*/, "").trim();
-  };
+      const name = $(tds[config.selectors.nameColumn as number])
+        .text()
+        .trim();
+      // PDFリンク
+      const pdfLink = $(tds[config.selectors.pdfLinkColumn as number])
+        .find("a")
+        .attr("href");
 
-  const parseDateToISO = (
-    htmlText: string
-  ): { dateStart: string; dateEnd?: string } | null => {
-    const text = stripHtmlTags(htmlText);
-    // 「2025年5月3日(土)開催」「2025年8月2日(土)・3日(日)開催」
-    const mainMatch = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-    if (!mainMatch) return null;
+      if (dateText && name) {
+        // 全角英数字を半角に
+        const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
+          String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+        );
 
-    const year = mainMatch[1];
-    const month = mainMatch[2].padStart(2, "0");
-    const day = mainMatch[3].padStart(2, "0");
-    const dateStart = `${year}-${month}-${day}`;
+        // 日付フォーマット整形 (例: 4月10日 -> 2025-04-10)
+        // 空知は "4/12", "5/3-4" のような形式
+        const year = 2025; // TODO: ページから年度取得
+        const dateMatch = normalizedDate.match(/(\d+)\/(\d+)(?:-(\d+))?/);
 
-    // 開催日の範囲のみ抽出（〆切・締切部分は除外）
-    // 「＊」や「*」以降は締切情報なので除外
-    const asteriskIdx = text.search(/[＊*]/);
-    const cutoff = asteriskIdx >= 0 ? asteriskIdx : text.length;
-    const datePart = text.substring(0, cutoff);
+        if (dateMatch) {
+          const month = dateMatch[1].padStart(2, "0");
+          const day = dateMatch[2].padStart(2, "0");
+          const endDay = dateMatch[3] ? dateMatch[3].padStart(2, "0") : null;
+          const dateStr = endDay
+            ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
+            : `${year}-${month}-${day}`;
 
-    // 終了日パターン:
-    // ・24日, ～24日, 29日(日) (直後に別の日付がある場合)
-    const endMatch = datePart.match(
-      /\d{1,2}日\s*\([^)]*\)\s*[・～〜~]?\s*(\d{1,2})日/
-    );
-    const dateEnd = endMatch
-      ? `${year}-${month}-${endMatch[1].padStart(2, "0")}`
-      : undefined;
+          const detailUrl = pdfLink
+            ? new URL(pdfLink, config.baseUrl).toString()
+            : config.url;
 
-    return { dateStart, dateEnd };
-  };
+          // 除外条件（タイトル行など）
+          if (name === "大会名") return;
 
-  for (const block of blocks) {
-    const content = block.content as Record<string, unknown> | undefined;
-    if (!content) continue;
-    const category = block.category as string;
-
-    if (category === "List") {
-      // List型ブロック
-      const items = content.items as
-        | { items?: Record<string, unknown>[] }
-        | undefined;
-      const listItems = items?.items || [];
-      for (const item of listItems) {
-        const itemContent = item.content as Record<string, unknown> | undefined;
-        if (!itemContent) continue;
-
-        const text0 = itemContent.text0 as
-          | { data?: { text?: string } }
-          | undefined;
-        const text1 = itemContent.text1 as
-          | { data?: { text?: string } }
-          | undefined;
-        const primaryCTA = itemContent.primaryCTA as
-          | { data?: { targetFileUuid?: string; label?: string }; visible?: boolean }
-          | undefined;
-        const secondaryCTA = itemContent.secondaryCTA as
-          | { data?: { targetFileUuid?: string; label?: string }; visible?: boolean }
-          | undefined;
-
-        const nameHtml = text0?.data?.text || "";
-        const dateHtml = text1?.data?.text || "";
-        const name = extractEventName(nameHtml);
-        const parsed = parseDateToISO(dateHtml);
-
-        if (!name || !parsed) continue;
-
-        // 要項PDFのUUIDを取得（primaryCTA優先、なければsecondaryCTA）
-        let pdfUrl: string | undefined;
-        const fileUuid =
-          primaryCTA?.data?.targetFileUuid ||
-          secondaryCTA?.data?.targetFileUuid;
-        if (fileUuid) {
-          pdfUrl = resolveFileUrl(fileUuid);
+          events.push({
+            name,
+            dateText: dateStr,
+            pdfUrl: detailUrl.endsWith(".pdf") ? detailUrl : undefined,
+            detailUrl,
+          });
         }
+      }
+    });
+  } else if (config.parser === "kushiro") {
+    // 釧路: テーブル形式
+    $(config.selectors.eventRow).each((_, el) => {
+      const tds = $(el).find("td");
+      if (tds.length === 0) return;
 
+      const dateText = $(tds[config.selectors.dateColumn as number])
+        .text()
+        .trim();
+      const name = $(tds[config.selectors.nameColumn as number])
+        .text()
+        .trim();
+      const pdfLink = $(tds[config.selectors.pdfLinkColumn as number])
+        .find("a")
+        .attr("href");
+
+      if (dateText && name) {
+        const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
+          String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+        );
+        // 釧路: "4月29日(土)"
+        // 4月29日(土)～30日(日)
+        const dateMatch = normalizedDate.match(/(\d+)月(\d+)日/);
+
+        if (dateMatch) {
+          const year = 2025;
+          const month = dateMatch[1].padStart(2, "0");
+          const day = dateMatch[2].padStart(2, "0");
+
+          // 終了日の抽出（簡易実装）
+          const endDateMatch = normalizedDate.match(/～(\d+)日/);
+          const endDay = endDateMatch
+            ? endDateMatch[1].padStart(2, "0")
+            : null;
+
+          const dateStr = endDay
+            ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
+            : `${year}-${month}-${day}`;
+
+          const detailUrl = pdfLink
+            ? new URL(pdfLink, config.baseUrl).toString()
+            : config.url;
+
+          if (name === "大会名") return;
+
+          events.push({
+            name,
+            dateText: dateStr,
+            pdfUrl: detailUrl.endsWith(".pdf") ? detailUrl : undefined,
+            detailUrl,
+          });
+        }
+      }
+    });
+  } else if (config.parser === "douo") {
+    // 道央: Jimdo JSONパース
+    // window.__WEBSITE_PROPS__を探すのは複雑なので、HTML構造から頑張って取る
+    // div.j-module.n.j-text > p
+    // "2025年 4月19日（土）" ...
+    $(".j-module.n.j-text p").each((_, el) => {
+      const text = $(el).text().trim();
+      // 例: "2025年 4月19日（土） 第１回道央陸上競技記録会 （千歳）"
+      const match = text.match(
+        /(\d{4})年\s*(\d{1,2})月(\d{1,2})日(?:[(（].*?[)）])?(?:\s*～\s*(\d{1,2})日)?\s*(.*)/
+      );
+
+      if (match) {
+        const year = match[1];
+        const month = match[2].padStart(2, "0");
+        const day = match[3].padStart(2, "0");
+        const endDay = match[4] ? match[4].padStart(2, "0") : null;
+        const name = match[5].trim();
+
+        const dateStr = endDay
+          ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
+          : `${year}-${month}-${day}`;
+
+        // PDFリンクはこのpタグ内か近くにあるはずだが、一旦省略
         events.push({
           name,
-          dateText: parsed.dateEnd
-            ? `${parsed.dateStart}~${parsed.dateEnd}`
-            : parsed.dateStart,
-          pdfUrl,
-          detailUrl: pdfUrl || config.url,
+          dateText: dateStr,
+          detailUrl: config.url,
         });
       }
-    } else if (category === "Columns") {
-      // Columns型ブロック：タイトルと日付がcontent.textに入っている
-      const textBlock = content.text as
-        | { data?: { text?: string } }
-        | undefined;
-      const textHtml = textBlock?.data?.text || "";
-      const name = extractEventName(textHtml);
-      const parsed = parseDateToISO(textHtml);
+    });
+  } else if (config.parser === "tokachi") {
+    // 十勝: テーブル形式（日付/大会名/会場/要項PDF等）
+    const year = 2025;
+    $("table tr").each((_, el) => {
+      const tds = $(el).find("td");
+      if (tds.length < 3) return;
 
-      if (!name || !parsed) continue;
+      const dateText = $(tds[0]).text().trim();
+      // colspanがある場合があるため、大会名は2番目のtd（colspan=2の可能性あり）
+      const name = $(tds[1]).text().trim();
 
-      // 最初のcolumnのprimaryCTAから要項PDFを取得
-      const columns = content.columns as
-        | { items?: Record<string, unknown>[] }
-        | undefined;
-      let pdfUrl: string | undefined;
-      const firstCol = columns?.items?.[0];
-      if (firstCol) {
-        const colContent = firstCol.content as
-          | Record<string, unknown>
-          | undefined;
-        const cta = colContent?.primaryCTA as
-          | { data?: { targetFileUuid?: string }; visible?: boolean }
-          | undefined;
-        if (cta?.data?.targetFileUuid) {
-          pdfUrl = resolveFileUrl(cta.data.targetFileUuid);
+      if (!dateText || !name) return;
+
+      // 全角→半角
+      const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
+        String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+      );
+
+      // "3月22日(土)" or "7月5日(土)～6日(日)"
+      const dateMatch = normalizedDate.match(/(\d+)月(\d+)日/);
+      if (!dateMatch) return;
+
+      const month = dateMatch[1].padStart(2, "0");
+      const day = dateMatch[2].padStart(2, "0");
+      const endMatch = normalizedDate.match(/～(\d+)日/);
+      const endDay = endMatch ? endMatch[1].padStart(2, "0") : null;
+
+      const dateStr = endDay
+        ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
+        : `${year}-${month}-${day}`;
+
+      // PDFリンク: 全tdから最初の.pdfリンクを検索
+      let pdfHref: string | undefined;
+      tds.each((_, td) => {
+        if (pdfHref) return;
+        const link = $(td).find("a[href$='.pdf']").attr("href");
+        if (link) pdfHref = link;
+      });
+
+      const detailUrl = pdfHref
+        ? new URL(pdfHref, config.baseUrl).toString()
+        : config.url;
+
+      // 会場（3番目のtd、存在すれば）
+      const location = tds.length >= 3 ? $(tds[2]).text().trim() : "";
+
+      events.push({
+        name: location ? `${name}　${location}` : name,
+        dateText: dateStr,
+        pdfUrl: detailUrl.endsWith(".pdf") ? detailUrl : undefined,
+        detailUrl,
+      });
+    });
+  } else if (config.parser === "chuutairen") {
+    // 中体連: テーブル形式（月日/大会名/開催地/要項/申込書/その他）
+    const year = 2025;
+    $("table tr").each((_, el) => {
+      const tds = $(el).find("td");
+      if (tds.length < 3) return;
+
+      const dateText = $(tds[0]).text().trim();
+      const name = $(tds[1]).text().trim();
+      const location = $(tds[2]).text().trim();
+
+      if (!dateText || !name) return;
+
+      // ヘッダー行スキップ
+      if (name.includes("大　会　名") || name.includes("大会名")) return;
+
+      const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
+        String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+      );
+
+      const dateMatch = normalizedDate.match(/(\d+)月(\d+)日/);
+      if (!dateMatch) return;
+
+      const month = dateMatch[1].padStart(2, "0");
+      const day = dateMatch[2].padStart(2, "0");
+      const endMatch = normalizedDate.match(/[～〜](\d+)日/);
+      const endDay = endMatch ? endMatch[1].padStart(2, "0") : null;
+
+      const dateStr = endDay
+        ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
+        : `${year}-${month}-${day}`;
+
+      // 要項PDFリンク（td[3]内のa要素、絶対URLの場合あり）
+      let pdfHref: string | undefined;
+      if (tds.length > 3) {
+        const link = $(tds[3]).find("a").attr("href");
+        if (link) {
+          pdfHref = link.startsWith("http")
+            ? link
+            : new URL(link, config.baseUrl).toString();
         }
       }
 
+      const detailUrl = pdfHref || config.url;
+
       events.push({
-        name,
-        dateText: parsed.dateEnd
-          ? `${parsed.dateStart}~${parsed.dateEnd}`
-          : parsed.dateStart,
-        pdfUrl,
-        detailUrl: pdfUrl || config.url,
+        name: location ? `${name}　${location}` : name,
+        dateText: dateStr,
+        pdfUrl: detailUrl.endsWith(".pdf") ? detailUrl : undefined,
+        detailUrl,
       });
+    });
+  } else if (config.parser === "gakuren") {
+    // 学連: Google Sites Classic — テキスト＋リンクから正規表現で抽出
+    // ページ全体のテキストから「M/D(曜) 大会名 @会場」パターンを検索
+    const text = $.text();
+    const year = 2025;
+    // パターン: "5/3(土) 2025年度北海道学連競技会第1戦 @円山公園陸上競技場"
+    const lines = text.split(/\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // "M/D(曜)" or "M/D(曜)～D(曜)" のパターン
+      const match = trimmed.match(
+        /(\d{1,2})\/(\d{1,2})\([日月火水木金土]\)(?:\s*[～~]\s*(\d{1,2})\/(\d{1,2})\([日月火水木金土]\))?\s+(.+?)(?:\s+@(.+))?$/
+      );
+      if (match) {
+        const month = match[1].padStart(2, "0");
+        const day = match[2].padStart(2, "0");
+        const endMonth = match[3] ? match[3].padStart(2, "0") : null;
+        const endDay = match[4] ? match[4].padStart(2, "0") : null;
+        const name = match[5].trim();
+        const location = match[6] ? match[6].trim() : "";
+
+        const dateStr = endDay
+          ? `${year}-${month}-${day}~${year}-${endMonth || month}-${endDay}`
+          : `${year}-${month}-${day}`;
+
+        events.push({
+          name: location ? `${name}　${location}` : name,
+          dateText: dateStr,
+          detailUrl: config.url,
+        });
+      }
     }
   }
 
   return events;
 }
 
-// ──────────────────────────────────────────
-// 札幌陸協パーサー（2段階スクレイピング）
-// 1. スケジュールページ: table.nomal-table の行を解析
-//    列構造: 月(rowspan) / 日 / 曜日 / 大会名(td.name) / 会場
-// 2. 要項ページ: h3大会名 → 直後のul内のPDFリンク
-// 3. 大会名の部分一致でPDFを紐付け
-// ──────────────────────────────────────────
 function parseSapporo(
   scheduleHtml: string,
   guidelineHtml: string,
   config: SiteConfig
 ): ScrapedEventRaw[] {
-  const $ = cheerio.load(scheduleHtml);
   const events: ScrapedEventRaw[] = [];
-  const year = new Date().getFullYear().toString();
-
-  // Step 1: スケジュールテーブル解析
-  const rows = $("table.nomal-table tr");
-  let currentMonth = "";
-
-  rows.each((_i, row) => {
-    const tds = $(row).find("td");
-    if (tds.length === 0) return;
-
-    const cellTexts: string[] = [];
-    const cellClasses: string[] = [];
-    tds.each((_j, td) => {
-      cellTexts.push($(td).text().trim());
-      cellClasses.push($(td).attr("class") || "");
-    });
-
-    // 月カラム（rowspanで複数行にまたがる）
-    // 5列 = 月あり: 月/日/曜/大会名/会場
-    // 4列 = 月なし: 日/曜/大会名/会場
-    // 2列 = 日付のみ（複数日開催の2日目以降）: 日/曜
-    let day: string;
-    let eventName: string;
-    let venue: string;
-
-    if (cellTexts.length >= 5) {
-      // 5列 = 月あり行: 月/日/曜/大会名/会場
-      const monthText = cellTexts[0].replace(/\s/g, "");
-      if (monthText && /^\d+$/.test(monthText)) currentMonth = monthText;
-      day = cellTexts[1];
-      eventName = cellTexts[3];
-      venue = cellTexts[4];
-    } else if (cellTexts.length >= 4 && cellClasses.some((c) => c === "name")) {
-      // 4列 = 月なし行（大会名あり）: 日/曜/大会名/会場
-      day = cellTexts[0];
-      eventName = cellTexts[2];
-      venue = cellTexts[3];
-    } else {
-      // 2列（複数日開催の追加日など）→スキップ
-      return;
-    }
-
-    if (!currentMonth || !day || !eventName) return;
-    // 審判講習会/研修会はスキップ
-    if (eventName.includes("審判講習会") || eventName.includes("審判研修会"))
-      return;
-    // 時刻プレフィックスを除去（例: "（13時30分）審判講習会", "～13時）...", "13時～）..."）
-    eventName = eventName.replace(/^[（(～~]?[^）)]*[時分][^）)]*[）)]\s*/, "").trim();
-    if (!eventName) return;
-
-    const dayNum = day.replace(/[^0-9]/g, "");
-    if (!dayNum) return;
-
-    const dateText = `${year}-${currentMonth.padStart(2, "0")}-${dayNum.padStart(2, "0")}`;
-
-    // 大会名に会場を付加
-    const fullName = venue ? `${eventName}　${venue}` : eventName;
-
-    events.push({
-      name: fullName,
-      dateText,
-      detailUrl: config.url,
-    });
-  });
-
-  // Step 2: 要項ページからPDFリンクをマッピング
+  const $s = cheerio.load(scheduleHtml);
   const $g = cheerio.load(guidelineHtml);
-  const guidelineMap: { name: string; pdfUrl: string }[] = [];
 
-  $g("h3").each((_i, h3) => {
-    const name = $g(h3).text().trim();
-    if (!name) return;
-    // h3の次のdiv内のul.doc-listから最初のPDFリンクを取得
-    const nextDiv = $g(h3).next("div");
-    const pdfLink = nextDiv.find("a[href$='.pdf']").first();
-    if (pdfLink.length > 0) {
-      const href = pdfLink.attr("href") || "";
-      const pdfUrl = href.startsWith("http")
-        ? href
-        : new URL(href, config.guidelineUrl).toString();
-      guidelineMap.push({ name, pdfUrl });
+  // 1. スケジュールから基本情報を取得
+  const scheduleMap = new Map<string, { date: string; location: string }>();
+
+  $s(config.selectors.eventRow).each((_, el) => {
+    const tds = $s(el).find("td");
+    if (tds.length < 5) return;
+
+    const month = $s(tds[0]).text().trim(); // "4"
+    const day = $s(tds[1]).text().trim(); // "29"
+    // const wday = $s(tds[2]).text().trim();
+    const name = $s(tds[3]).text().trim();
+    const location = $s(tds[4]).text().trim();
+
+    if (month && day && name) {
+      // 日付の正規化 (範囲は対応が難しいので開始日のみ)
+      const dayClean = day.split("～")[0].split("~")[0].replace(/\D/g, "");
+      const year = 2025; // 簡易
+      const dateStr = `${year}-${month.padStart(2, "0")}-${dayClean.padStart(
+        2,
+        "0"
+      )}`;
+
+      scheduleMap.set(name, { date: dateStr, location });
     }
   });
 
-  // Step 3: 部分一致でPDFを紐付け
-  const normalizeName = (name: string): string =>
-    name
-      .replace(/\s+/g, "")
-      .replace(/[０-９]/g, (ch) =>
-        String.fromCharCode(ch.charCodeAt(0) - 0xfee0)
-      )
-      .replace(/（[^）]*）/g, "") // 括弧内を除去（「（高校一般）」等）
-      .replace(/^\d{4}/, ""); // 先頭の年を除去（「2025」等）
+  // 2. 要項ページからPDFリンクと正式名称を取得し、スケジュール情報とマージ
+  // 札幌陸協の構造: <h3 class="ttl-h3">大会名</h3> ... <ul class="link-list"><li><a>要項</a></li></ul>
+  $g(".ttl-h3").each((_, el) => {
+    const name = $g(el).text().trim();
+    // 次のulを探す
+    const nextUl = $g(el).nextAll("ul.link-list").first();
+    const pdfLink = nextUl.find("a").attr("href"); // 最初のリンクを要項とみなす
 
-  for (const event of events) {
-    // イベント名から会場部分を除いて比較
-    const eventNameOnly = event.name.replace(/[　\s]+[^\s　]+$/, "");
-    const matched = guidelineMap.find((g) => {
-      const gNorm = normalizeName(g.name);
-      const eNorm = normalizeName(eventNameOnly);
-      return gNorm.includes(eNorm) || eNorm.includes(gNorm);
-    });
-    if (matched) {
-      event.pdfUrl = matched.pdfUrl;
-      event.detailUrl = matched.pdfUrl;
+    // 名前でスケジュールを検索（完全一致しない場合が多いので部分一致推奨だが、一旦完全一致でtrial）
+    // 札幌陸協は表記揺れが少ないが、スペース有無などでずれるかも
+    let scheduleInfo = scheduleMap.get(name);
+
+    // 見つからない場合、scheduleMapのキーをループして包含チェック
+    if (!scheduleInfo) {
+      for (const [key, val] of scheduleMap.entries()) {
+        if (key.includes(name) || name.includes(key)) {
+          scheduleInfo = val;
+          break;
+        }
+      }
     }
-  }
+
+    if (scheduleInfo) {
+      const detailUrl = pdfLink
+        ? new URL(pdfLink, config.baseUrl).toString()
+        : config.guidelineUrl || config.url;
+
+      events.push({
+        name: name + (scheduleInfo.location ? `　${scheduleInfo.location}` : ""), // 場所を名前に付加して保存
+        dateText: scheduleInfo.date,
+        pdfUrl: detailUrl.endsWith(".pdf") ? detailUrl : undefined,
+        detailUrl,
+      });
+    }
+  });
 
   return events;
 }
 
-// ──────────────────────────────────────────
-// 北海道陸協パーサー
-// 構造: h3(大会名) → dl > dt(開催地/日程/要項) + dd(値)
-// ──────────────────────────────────────────
-async function parseHokkaido(html: string, config: SiteConfig): Promise<ScrapedEventRaw[]> {
-  const $ = cheerio.load(html);
+async function parseHokkaido(
+  html: string,
+  config: SiteConfig
+): Promise<ScrapedEventRaw[]> {
   const events: ScrapedEventRaw[] = [];
+  const $ = cheerio.load(html);
 
-  $("h3").each((_i, h3) => {
-    const name = $(h3).text().trim();
-    if (!name) return;
-    // 「2025年度大会要項」のようなセクションタイトルをスキップ
-    if (name.includes("年度") && name.includes("要項")) return;
+  // 1. HTMLから個別大会を取得（dl.web_guidelines構造）
+  $("dl.web_guidelines").each((_, el) => {
+    const dt = $(el).find("dt");
+    const name = dt.text().trim();
+    const dd = $(el).find("dd");
 
-    const dl = $(h3).next("dl");
-    if (!dl.length) return;
+    let prev = $(el).prev();
+    while (prev.length && !prev.is("h3")) {
+      prev = prev.prev();
+    }
+    const dateTextSource = prev.text().trim();
 
-    let location = "";
-    let dateText = "";
-    let pdfUrl: string | undefined;
-
-    dl.find("dt").each((_j, dt) => {
-      const dtText = $(dt).text().trim();
-      const dd = $(dt).next("dd");
-      const ddText = dd.text().trim();
-
-      if (dtText === "開催地") {
-        location = ddText;
-      } else if (dtText === "日程") {
-        // 「2025年7月12日（土）～13日（日）」のような形式
-        dateText = ddText;
-      } else if (dtText === "要項") {
-        // 最初のPDFリンクを取得
-        const link = dd.find("a[href$='.pdf']").first();
-        if (link.length > 0) {
-          const href = link.attr("href") || "";
-          pdfUrl = href.startsWith("http")
-            ? href
-            : new URL(href, config.url).toString();
-        }
-      }
-    });
-
-    if (!name || !dateText) return;
-
-    // 日付パース: 「2025年7月12日（土）～13日（日）」
-    const dateMatch = dateText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    const dateMatch = dateTextSource.match(
+      /(\d{1,2})月(\d{1,2})日(?:[～~](\d{1,2})日)?/
+    );
     if (!dateMatch) return;
 
-    const year = dateMatch[1];
-    const month = dateMatch[2].padStart(2, "0");
-    const day = dateMatch[3].padStart(2, "0");
-    const dateStart = `${year}-${month}-${day}`;
+    const month = dateMatch[1].padStart(2, "0");
+    const day = dateMatch[2].padStart(2, "0");
+    const endDay = dateMatch[3] ? dateMatch[3].padStart(2, "0") : null;
+    const year = 2025;
 
-    // 終了日
-    const endMatch = dateText.match(/[～〜~]\s*(\d{1,2})日/);
-    const dateEnd = endMatch
-      ? `${year}-${month}-${endMatch[1].padStart(2, "0")}`
-      : undefined;
+    const dateStr = endDay
+      ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
+      : `${year}-${month}-${day}`;
 
-    // 大会名に場所を付加（既存のextractLocationFromNameと互換性のため）
-    const fullName = location ? `${name}　${location}` : name;
+    const pdfLink = dd.find("a").filter((_, a) => $(a).text().includes("要項")).attr("href")
+      || dd.find("a[href$='.pdf']").attr("href");
+
+    const detailUrl = pdfLink
+      ? new URL(pdfLink, config.baseUrl).toString()
+      : config.url;
 
     events.push({
-      name: fullName,
-      dateText: dateEnd ? `${dateStart}~${dateEnd}` : dateStart,
-      pdfUrl,
-      detailUrl: pdfUrl || config.url,
+      name,
+      dateText: dateStr,
+      pdfUrl: detailUrl.endsWith(".pdf") ? detailUrl : undefined,
+      detailUrl,
     });
   });
 
-  // 既存のHTMLパース結果
-  const infoEvents = events;
-
-  // もしscheduleUrlがあれば、そこからPDFを探してパースする
+  // 2. スケジュールPDFをClaude APIで解析してマージ
   if (config.scheduleUrl) {
     try {
       console.log(`[Hokkaido] Fetching schedule page: ${config.scheduleUrl}`);
       const scheduleHtml = await fetchHtml(config.scheduleUrl);
       const $s = cheerio.load(scheduleHtml);
 
-      // 「主要競技会日程表」またはそれに類するPDFリンクを探す
-      // 2025年度など、年度を含むリンクを優先したいが、まずは「日程表」を含むものを
+      // 「全競技会日程」を優先
       let pdfLink = $s("a").filter((_, el) => {
         const text = $s(el).text();
-        return text.includes("日程表") && ($s(el).attr("href")?.endsWith(".pdf") || false);
+        const href = $s(el).attr("href") || "";
+        return text.includes("全競技会") && href.endsWith(".pdf");
       }).first();
 
-      // なければ「全競技会日程」など
-      if (pdfLink.length === 0) {
+      // なければ「日程」を含むPDF
+      if (!pdfLink.length) {
+        pdfLink = $s("a").filter((_, el) => {
+          const text = $s(el).text();
+          const href = $s(el).attr("href") || "";
+          return text.includes("日程") && href.endsWith(".pdf");
+        }).first();
+      }
+
+      // 最終フォールバック: 任意のPDF
+      if (!pdfLink.length) {
         pdfLink = $s("a[href$='.pdf']").first();
       }
 
@@ -686,23 +513,28 @@ async function parseHokkaido(html: string, config: SiteConfig): Promise<ScrapedE
         console.log(`[Hokkaido] Found schedule PDF: ${pdfUrl}`);
 
         const pdfBuffer = await downloadPdf(pdfUrl);
-        // pdf-parseを動的インポート（サーバーサイドのみ）
-        // index.jsのデバッグコード回避のためlib/pdf-parse.jsを直接require
-        // ES Module環境(tsxなど)でも動作するようにcreateRequireを使用
-        const { createRequire } = await import("module");
-        const require = createRequire(import.meta.url);
-        const pdfParse = require("pdf-parse/lib/pdf-parse.js");
-        const data = await pdfParse(pdfBuffer);
-        const pdfEvents = parseHokkaidoPdfText(data.text, config, pdfUrl);
+        const pdfEvents = await parseSchedulePdfWithClaude(pdfBuffer);
+        console.log(`[Hokkaido] Claude extracted ${pdfEvents.length} events from schedule PDF`);
 
-        // マージ（重複排除: 日付と名前が類似している場合はinfoEventsを優先）
-        // infoEventsには詳細リンク(要項PDF)があることが多いので優先
+        // マージ（HTML側を優先、PDF側で新規のもののみ追加）
         for (const pe of pdfEvents) {
-          const exists = infoEvents.some(ie =>
-            ie.dateText === pe.dateText && normalizeName(ie.name) === normalizeName(pe.name)
-          );
+          const peDate = pe.date;
+          const peName = pe.name.replace(/\s+/g, "");
+          const exists = events.some(ie => {
+            const ieDate = ie.dateText.split("~")[0];
+            const ieName = ie.name.replace(/\s+/g, "");
+            return ieDate === peDate && (ieName.includes(peName.substring(0, 5)) || peName.includes(ieName.substring(0, 5)));
+          });
           if (!exists) {
-            events.push(pe);
+            const dateStr = pe.dateEnd
+              ? `${pe.date}~${pe.dateEnd}`
+              : pe.date;
+            events.push({
+              name: pe.location ? `${pe.name}　${pe.location}` : pe.name,
+              dateText: dateStr,
+              pdfUrl,
+              detailUrl: pdfUrl,
+            });
           }
         }
       }
@@ -715,90 +547,178 @@ async function parseHokkaido(html: string, config: SiteConfig): Promise<ScrapedE
 }
 
 /**
- * 簡易的な名前正規化（スペース除去、全角英数→半角）
+ * 高体連: ページからスケジュールPDFを見つけてClaude APIで全大会を抽出
+ * Jimdoサイト（Cloudflare保護あり）— __WEBSITE_PROPS__ JSON内にPDFリンクが埋まっている
  */
-function normalizeName(name: string): string {
-  return name.replace(/\s+/g, "")
-    .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+async function parseKoutairen(
+  html: string,
+  config: SiteConfig
+): Promise<ScrapedEventRaw[]> {
+  const events: ScrapedEventRaw[] = [];
+
+  try {
+    // Jimdo構造: __WEBSITE_PROPS__ JSON内のdownload URLを探す
+    // または j-downloadDocument 内のリンク
+    const $ = cheerio.load(html);
+
+    // 方法1: <a>タグから.pdfリンクを直接検索
+    let pdfUrl: string | undefined;
+    $("a").each((_, el) => {
+      const href = $(el).attr("href") || "";
+      if (href.includes(".pdf") && (href.includes("大会") || href.includes("日程") || href.includes("schedule"))) {
+        pdfUrl = href.startsWith("http") ? href : new URL(href, config.baseUrl).toString();
+        return false; // break
+      }
+    });
+
+    // 方法2: __WEBSITE_PROPS__ JSONからPDFリンクを抽出
+    if (!pdfUrl) {
+      const propsMatch = html.match(/window\.__WEBSITE_PROPS__\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/);
+      if (propsMatch) {
+        // ブレースカウントで完全なJSONを抽出（非貪欲正規表現は不可）
+        const startIdx = html.indexOf("window.__WEBSITE_PROPS__");
+        if (startIdx !== -1) {
+          const jsonStart = html.indexOf("{", startIdx);
+          let depth = 0;
+          let jsonEnd = jsonStart;
+          for (let i = jsonStart; i < html.length; i++) {
+            if (html[i] === "{") depth++;
+            if (html[i] === "}") depth--;
+            if (depth === 0) {
+              jsonEnd = i + 1;
+              break;
+            }
+          }
+          const jsonStr = html.substring(jsonStart, jsonEnd);
+          // PDF URLを正規表現で検索（JSON全体をパースする必要なし）
+          const pdfMatches = jsonStr.match(/https?:[^"]*\.pdf/g);
+          if (pdfMatches && pdfMatches.length > 0) {
+            // 「日程」「大会」を含むPDFを優先
+            pdfUrl = pdfMatches.find(u => u.includes("日程") || u.includes("大会"))
+              || pdfMatches[0];
+            pdfUrl = pdfUrl.replace(/\\\//g, "/"); // JSONエスケープ解除
+          }
+        }
+      }
+    }
+
+    // 方法3: download系のリンクを探す
+    if (!pdfUrl) {
+      $("a").each((_, el) => {
+        const href = $(el).attr("href") || "";
+        if (href.includes("/app/download/") || href.includes(".pdf")) {
+          pdfUrl = href.startsWith("http") ? href : new URL(href, config.baseUrl).toString();
+          return false;
+        }
+      });
+    }
+
+    if (pdfUrl) {
+      console.log(`[Koutairen] Found schedule PDF: ${pdfUrl}`);
+      const pdfBuffer = await downloadPdf(pdfUrl);
+      const pdfEvents = await parseSchedulePdfWithClaude(pdfBuffer);
+      console.log(`[Koutairen] Claude extracted ${pdfEvents.length} events from schedule PDF`);
+
+      for (const pe of pdfEvents) {
+        const dateStr = pe.dateEnd ? `${pe.date}~${pe.dateEnd}` : pe.date;
+        events.push({
+          name: pe.location ? `${pe.name}　${pe.location}` : pe.name,
+          dateText: dateStr,
+          pdfUrl,
+          detailUrl: pdfUrl,
+        });
+      }
+    } else {
+      console.warn("[Koutairen] No schedule PDF found on page");
+    }
+  } catch (e) {
+    console.error("[Koutairen] Failed to parse:", e);
+  }
+
+  return events;
 }
 
 /**
- * 北海道のスケジュールPDFテキストからイベントを抽出
- * テキスト形式: "１２日（土）第３８回南部忠平記念陸上競技大会（GP）札幌市"
+ * マスターズ: schedule.php からスケジュールテーブル取得、
+ * なければ news.php のニュース一覧から大会情報を抽出
  */
-function parseHokkaidoPdfText(text: string, config: SiteConfig, pdfUrl: string): ScrapedEventRaw[] {
+async function parseMasters(
+  scheduleHtml: string,
+  config: SiteConfig
+): Promise<ScrapedEventRaw[]> {
   const events: ScrapedEventRaw[] = [];
-  const lines = text.split(/\r?\n/);
-  const year = new Date().getFullYear().toString(); // PDFから年度取れればベストだがとりあえず現在年/configURLから
+  const $ = cheerio.load(scheduleHtml);
 
-  let currentMonth = "";
+  // 1. schedule.php にスケジュールテーブルがあるか確認
+  $("table tr").each((_, el) => {
+    const tds = $(el).find("td");
+    if (tds.length < 2) return;
 
-  // 1行ずつ処理
-  // 日付パターン: "１２日", "２０(土)", "２６(土)～２７(日)"
-  const dayPattern = /^(\d{1,2}|[０-９]{1,2})\s*[(（]?[日月火水木金土][)）]?/;
+    const dateText = $(tds[0]).text().trim();
+    const name = $(tds[1]).text().trim();
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+    if (!dateText || !name) return;
 
-    // 月の判定: "４月", "10月"
-    const monthMatch = trimmed.match(/^(\d{1,2}|[０-９]{1,2})\s*月$/);
-    if (monthMatch) {
-      currentMonth = monthMatch[1].replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
-      continue;
-    }
+    const dateMatch = dateText.match(/(\d+)月(\d+)日/);
+    if (!dateMatch) return;
 
-    if (!currentMonth) continue;
+    const year = 2025;
+    const month = dateMatch[1].padStart(2, "0");
+    const day = dateMatch[2].padStart(2, "0");
 
-    // 行頭が日付で始まるか
-    // 全角数字対応
-    const normalizedLine = trimmed.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
-    const dateMatch = normalizedLine.match(/^(\d{1,2})\s*[(（].*?[)）]/); // 12(土) または 12日(土)
+    events.push({
+      name,
+      dateText: `${year}-${month}-${day}`,
+      detailUrl: config.url,
+    });
+  });
 
-    // 日付のみで始まる行、または "13(土) イベント名" のような行
-    if (dateMatch) {
-      // 日付部分抽出
-      // 例: "２６(土)～２７(日) イベント..." -> "26", end="27"
-      // 例: "１３（土） ディスタンス..." -> "13"
+  // 2. スケジュールが取れなかった場合、news.php から大会情報を抽出
+  if (events.length === 0) {
+    try {
+      const newsHtml = await fetchHtml(config.baseUrl + "news.php");
+      const $n = cheerio.load(newsHtml);
 
-      // 日付範囲 "26(土)～27(日)"
-      const rangeMatch = normalizedLine.match(/^(\d{1,2}).*?[～〜~].*?(\d{1,2})/);
-      let dayStart = dateMatch[1];
-      let dayEnd: string | undefined;
-      let restOfLine = normalizedLine.substring(dateMatch[0].length).trim();
+      $n(".NEWSBox4").each((_, el) => {
+        const text = $n(el).find(".NEWSBox4Text").text().trim();
+        // ニュースタイトルから大会関連のものを抽出
+        // パターン: "M月D日開催" or "M/D開催" + 大会名
+        const dateInTitle = text.match(/(\d+)月(\d+)日(?:[（(][日月火水木金土・祝]+[）)])?(?:\s*開催)?/);
+        if (!dateInTitle) return;
 
-      if (rangeMatch) {
-        dayStart = rangeMatch[1];
-        dayEnd = rangeMatch[2];
-        // 範囲マッチの場合、行末の日付部分以降をイベント名とする
-        // "26(土)～27(日)" の長さ分を除去だと正確でないかも
-        // シンプルに "～27(日)" の後ろを探す
-        const endPattern = new RegExp(`${dayEnd}.*?[\\)）]`);
-        const endM = normalizedLine.match(endPattern);
-        if (endM && endM.index !== undefined) {
-          restOfLine = normalizedLine.substring(endM.index + endM[0].length).trim();
+        // 大会名に関連するキーワードがあるかチェック
+        if (!text.match(/大会|記録会|選手権|競技会/)) return;
+
+        const year = 2025;
+        const month = dateInTitle[1].padStart(2, "0");
+        const day = dateInTitle[2].padStart(2, "0");
+
+        // リンクからPDFを探す
+        const newsLink = $n(el).parent("a").attr("href");
+        const detailUrl = newsLink
+          ? new URL(newsLink, config.baseUrl).toString()
+          : config.url;
+
+        // 大会名を抽出（日付部分を除去）
+        let name = text
+          .replace(/(\d+)月(\d+)日[（(][日月火水木金土・祝]+[）)]\s*開催\s*/, "")
+          .replace(/要[項綱].*$/, "")
+          .replace(/をアップ.*$/, "")
+          .trim();
+        if (!name) name = text;
+
+        // 重複チェック
+        const exists = events.some(e => e.dateText === `${year}-${month}-${day}` && e.name.includes(name.substring(0, 5)));
+        if (!exists) {
+          events.push({
+            name,
+            dateText: `${year}-${month}-${day}`,
+            detailUrl,
+          });
         }
-      }
-
-      // イベント名抽出
-      if (!restOfLine) continue; // 日付だけの行かも?
-
-      const eventName = restOfLine;
-
-      // 日付構築
-      const dateTextStart = `${year}-${currentMonth.padStart(2, "0")}-${dayStart.padStart(2, "0")}`;
-      let dateText = dateTextStart;
-      if (dayEnd) {
-        const dateTextEnd = `${year}-${currentMonth.padStart(2, "0")}-${dayEnd.padStart(2, "0")}`;
-        dateText = `${dateTextStart}~${dateTextEnd}`;
-      }
-
-      events.push({
-        name: eventName,
-        dateText,
-        detailUrl: pdfUrl, // 詳細URLはPDF自体とする
-        pdfUrl: pdfUrl
       });
+    } catch (e) {
+      console.error("[Masters] Failed to fetch news.php:", e);
     }
   }
 
@@ -806,15 +726,79 @@ function parseHokkaidoPdfText(text: string, config: SiteConfig, pdfUrl: string):
 }
 
 /**
- * PDFをダウンロードしてバイナリデータを返す
+ * ランネット: 北海道の大会検索結果ページから大会一覧を取得
+ * 複数ページ対応（pageIndex=2）
  */
-export async function downloadPdf(url: string): Promise<Buffer> {
-  const res = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT },
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to download PDF: ${res.status} ${url}`);
+async function parseRunnet(
+  html: string,
+  config: SiteConfig
+): Promise<ScrapedEventRaw[]> {
+  const events: ScrapedEventRaw[] = [];
+
+  // ページ1をパース
+  parseRunnetPage(html, config, events);
+
+  // ページ2があれば取得
+  try {
+    const page2Url = config.url + "&pageIndex=2";
+    const html2 = await fetchHtml(page2Url);
+    parseRunnetPage(html2, config, events);
+  } catch (e) {
+    console.log("[Runnet] No page 2 or fetch failed:", e);
   }
-  const arrayBuffer = await res.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+
+  return events;
+}
+
+function parseRunnetPage(
+  html: string,
+  config: SiteConfig,
+  events: ScrapedEventRaw[]
+): void {
+  const $ = cheerio.load(html);
+
+  $("li.item").each((_, el) => {
+    // 大会名: .item-title a
+    const titleLink = $(el).find(".item-title a");
+    const name = titleLink.text().trim();
+    const href = titleLink.attr("href") || "";
+
+    // 日付: p.date or .body-head .date — "2026年5月17日(日)"
+    const dateText = $(el).find("p.date").text().trim();
+
+    // 開催地: p.place — "北海道（洞爺湖町）"
+    const place = $(el).find("p.place").text().trim();
+
+    // 種目: .infoTable の種目行
+    const disciplines = $(el).find(".infoTable tr").first().find("td").text().trim();
+
+    if (!name || !dateText) return;
+
+    // 日付パース: "2026年5月17日(日)"
+    const dateMatch = dateText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    if (!dateMatch) return;
+
+    const year = dateMatch[1];
+    const month = dateMatch[2].padStart(2, "0");
+    const day = dateMatch[3].padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+
+    // raceIdを抽出して詳細URLを生成
+    const raceIdMatch = href.match(/raceId=(\d+)/);
+    const detailUrl = raceIdMatch
+      ? `https://runnet.jp/entry/runtes/user/pc/competitionDetailAction.do?raceId=${raceIdMatch[1]}&div=1`
+      : config.url;
+
+    // 大会名に場所と距離情報を付加
+    const locationClean = place.replace(/^北海道[（(]/, "").replace(/[）)]$/, "");
+    const fullName = locationClean
+      ? `${name}　${locationClean}`
+      : name;
+
+    events.push({
+      name: fullName,
+      dateText: dateStr,
+      detailUrl,
+    });
+  });
 }

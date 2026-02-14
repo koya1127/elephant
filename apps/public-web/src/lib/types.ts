@@ -58,7 +58,8 @@ export interface ScrapedEventRaw {
 }
 
 /** サイトのHTMLパーサータイプ */
-export type SiteParserType = "sorachi" | "kushiro" | "douo" | "sapporo" | "hokkaido";
+export type SiteParserType = "sorachi" | "kushiro" | "douo" | "sapporo" | "hokkaido"
+  | "tokachi" | "chuutairen" | "koutairen" | "gakuren" | "masters" | "runnet";
 
 /** サイト定義 */
 export interface SiteConfig {

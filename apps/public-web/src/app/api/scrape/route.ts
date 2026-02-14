@@ -161,6 +161,10 @@ export async function POST(request: Request) {
       } as ScrapeResult & { skippedPdfs: number });
     }
 
+    // クロスサイト重複除去（北海道全競技会日程 vs 地域サイト）
+    // 地域サイトの方が要項PDF等の詳細があるため優先
+    deduplicateHokkaidoEvents(allResults, existing);
+
     // 同じsourceIdのデータを更新
     for (const result of allResults) {
       const idx = existing.findIndex((e) => e.sourceId === result.sourceId);
@@ -220,4 +224,57 @@ function extractLocationFromName(name: string): string {
   // 大会名末尾の場所名を抽出（例: "空知陸上競技記録会 第1戦　深川" → "深川"）
   const match = name.match(/[　\s]+([^\s　]+)$/);
   return match ? match[1] : "";
+}
+
+/**
+ * 名前正規化（スペース・全角英数を統一して比較しやすくする）
+ */
+function normalizeName(name: string): string {
+  return name
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/[Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+}
+
+/**
+ * 北海道全競技会日程のイベントから、他サイトと重複するものを除外する
+ * 地域サイト（空知・釧路・札幌・道央）は要項PDF等の詳細を持つため優先
+ */
+function deduplicateHokkaidoEvents(
+  allResults: ScrapeResult[],
+  existingResults: ScrapeResult[]
+): void {
+  const hokkaidoResult = allResults.find((r) => r.sourceId === "hokkaido");
+  if (!hokkaidoResult) return;
+
+  // 他サイトのイベントを集約（今回のスクレイプ結果 + 既存データ）
+  const otherEvents: Array<{ date: string; name: string }> = [];
+  for (const result of [...allResults, ...existingResults]) {
+    if (result.sourceId === "hokkaido") continue;
+    for (const event of result.events) {
+      otherEvents.push({ date: event.date, name: normalizeName(event.name) });
+    }
+  }
+
+  const before = hokkaidoResult.events.length;
+  hokkaidoResult.events = hokkaidoResult.events.filter((hEvent) => {
+    const hDate = hEvent.date;
+    const hName = normalizeName(hEvent.name);
+    // 同じ日付で名前が類似するイベントが他サイトにあれば除外
+    const isDupe = otherEvents.some((other) => {
+      if (other.date !== hDate) return false;
+      // 先頭6文字の部分一致で判定（"第XX回"等のプレフィックスを含めて比較）
+      if (hName.length < 6 || other.name.length < 6) {
+        return hName === other.name;
+      }
+      return hName.includes(other.name.substring(0, 6)) ||
+        other.name.includes(hName.substring(0, 6));
+    });
+    return !isDupe;
+  });
+
+  const removed = before - hokkaidoResult.events.length;
+  if (removed > 0) {
+    console.log(`[Dedup] Removed ${removed} duplicate events from hokkaido (${before} → ${hokkaidoResult.events.length})`);
+  }
 }

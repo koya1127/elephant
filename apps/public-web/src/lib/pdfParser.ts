@@ -142,6 +142,93 @@ function normalizeString(val: unknown): string | undefined {
   return String(val);
 }
 
+const SCHEDULE_PROMPT = `このPDFは陸上競技の大会スケジュール（年間日程表）です。
+すべての大会について以下の情報をJSON配列で抽出してください。
+
+各要素:
+- name: 大会名（正式名称）
+- date: 開催日（YYYY-MM-DD形式）
+- dateEnd: 複数日開催の場合の最終日（YYYY-MM-DD形式、1日のみなら省略）
+- location: 開催場所・会場名（記載があれば）
+
+注意:
+- 「中止」「延期」と記載のある大会は除外してください
+- 日付が不明な大会は除外してください
+- JSON配列のみで回答してください。マークダウンのコードブロックは不要です。`;
+
+interface ScheduleEvent {
+  name: string;
+  date: string;
+  dateEnd?: string;
+  location?: string;
+}
+
+/**
+ * スケジュールPDFをClaude APIで解析して大会一覧を取得する
+ */
+export async function parseSchedulePdfWithClaude(
+  pdfBuffer: Buffer
+): Promise<ScheduleEvent[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not set");
+  }
+
+  const client = new Anthropic({ apiKey });
+  const base64Pdf = pdfBuffer.toString("base64");
+
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 16384,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: "application/pdf",
+              data: base64Pdf,
+            },
+          },
+          {
+            type: "text",
+            text: SCHEDULE_PROMPT,
+          },
+        ],
+      },
+    ],
+  });
+
+  const textBlock = response.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("No text response from Claude API");
+  }
+
+  let jsonStr = textBlock.text.trim();
+  // コードブロックで囲まれている場合（閉じがない場合も対応）
+  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)(?:```|$)/);
+  if (codeBlockMatch) {
+    jsonStr = codeBlockMatch[1].trim();
+  }
+  // 先頭の [ を見つけて切り出す（前後の余計なテキストを除去）
+  const arrStart = jsonStr.indexOf("[");
+  const arrEnd = jsonStr.lastIndexOf("]");
+  if (arrStart !== -1 && arrEnd !== -1) {
+    jsonStr = jsonStr.substring(arrStart, arrEnd + 1);
+  }
+
+  const raw = JSON.parse(jsonStr);
+  if (!Array.isArray(raw)) {
+    throw new Error("Expected JSON array from Claude API");
+  }
+
+  return raw.filter(
+    (e: Record<string, unknown>) => e.name && e.date
+  ) as ScheduleEvent[];
+}
+
 /**
  * Excelファイルをテキストに変換してClaude APIで解析する
  */
