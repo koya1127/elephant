@@ -68,6 +68,8 @@ export interface SiteConfig {
   name: string;
   /** スクレイピング対象URL */
   url: string;
+  /** スケジュールPDF一覧ページURL（北海道など） */
+  scheduleUrl?: string;
   /** ベースURL（相対パス解決用） */
   baseUrl: string;
   /** 文字エンコーディング（デフォルト: utf-8） */

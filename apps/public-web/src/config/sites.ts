@@ -84,6 +84,7 @@ export const hokkaidoConfig: SiteConfig = {
   id: "hokkaido",
   name: "北海道陸上競技協会",
   url: "https://www.hokkaido-rikkyo.jp/information/index.html",
+  scheduleUrl: "https://hokkaido-rikkyo.jp/schedule/index.html",
   baseUrl: "https://www.hokkaido-rikkyo.jp/",
   parser: "hokkaido",
   selectors: {

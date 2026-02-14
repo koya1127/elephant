@@ -16,7 +16,7 @@ export async function scrapeEvents(
     const guidelineHtml = await fetchHtml(config.guidelineUrl);
     return parseSapporo(html, guidelineHtml, config);
   }
-  return parseEventsFromHtml(html, config);
+  return await parseEventsFromHtml(html, config);
 }
 
 const USER_AGENT =
@@ -47,10 +47,10 @@ async function fetchHtml(url: string, encoding?: string): Promise<string> {
 /**
  * パーサータイプに応じてHTMLからイベント一覧を抽出
  */
-function parseEventsFromHtml(
+async function parseEventsFromHtml(
   html: string,
   config: SiteConfig
-): ScrapedEventRaw[] {
+): Promise<ScrapedEventRaw[]> {
   switch (config.parser) {
     case "sorachi":
       return parseSorachi(html, config);
@@ -591,7 +591,7 @@ function parseSapporo(
 // 北海道陸協パーサー
 // 構造: h3(大会名) → dl > dt(開催地/日程/要項) + dd(値)
 // ──────────────────────────────────────────
-function parseHokkaido(html: string, config: SiteConfig): ScrapedEventRaw[] {
+async function parseHokkaido(html: string, config: SiteConfig): Promise<ScrapedEventRaw[]> {
   const $ = cheerio.load(html);
   const events: ScrapedEventRaw[] = [];
 
@@ -657,6 +657,147 @@ function parseHokkaido(html: string, config: SiteConfig): ScrapedEventRaw[] {
       detailUrl: pdfUrl || config.url,
     });
   });
+
+  // 既存のHTMLパース結果
+  const infoEvents = events;
+
+  // もしscheduleUrlがあれば、そこからPDFを探してパースする
+  if (config.scheduleUrl) {
+    try {
+      console.log(`[Hokkaido] Fetching schedule page: ${config.scheduleUrl}`);
+      const scheduleHtml = await fetchHtml(config.scheduleUrl);
+      const $s = cheerio.load(scheduleHtml);
+
+      // 「主要競技会日程表」またはそれに類するPDFリンクを探す
+      // 2025年度など、年度を含むリンクを優先したいが、まずは「日程表」を含むものを
+      let pdfLink = $s("a").filter((_, el) => {
+        const text = $s(el).text();
+        return text.includes("日程表") && ($s(el).attr("href")?.endsWith(".pdf") || false);
+      }).first();
+
+      // なければ「全競技会日程」など
+      if (pdfLink.length === 0) {
+        pdfLink = $s("a[href$='.pdf']").first();
+      }
+
+      if (pdfLink.length > 0) {
+        const href = pdfLink.attr("href") || "";
+        const pdfUrl = href.startsWith("http") ? href : new URL(href, config.scheduleUrl).toString();
+        console.log(`[Hokkaido] Found schedule PDF: ${pdfUrl}`);
+
+        const pdfBuffer = await downloadPdf(pdfUrl);
+        // pdf-parseを動的インポート（サーバーサイドのみ）
+        // index.jsのデバッグコード回避のためlib/pdf-parse.jsを直接require
+        const pdfParse = require("pdf-parse/lib/pdf-parse.js");
+        const data = await pdfParse(pdfBuffer);
+        const pdfEvents = parseHokkaidoPdfText(data.text, config, pdfUrl);
+
+        // マージ（重複排除: 日付と名前が類似している場合はinfoEventsを優先）
+        // infoEventsには詳細リンク(要項PDF)があることが多いので優先
+        for (const pe of pdfEvents) {
+          const exists = infoEvents.some(ie =>
+            ie.dateText === pe.dateText && normalizeName(ie.name) === normalizeName(pe.name)
+          );
+          if (!exists) {
+            events.push(pe);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[Hokkaido] Failed to parse schedule PDF:", e);
+    }
+  }
+
+  return events;
+}
+
+/**
+ * 簡易的な名前正規化（スペース除去、全角英数→半角）
+ */
+function normalizeName(name: string): string {
+  return name.replace(/\s+/g, "")
+    .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+}
+
+/**
+ * 北海道のスケジュールPDFテキストからイベントを抽出
+ * テキスト形式: "１２日（土）第３８回南部忠平記念陸上競技大会（GP）札幌市"
+ */
+function parseHokkaidoPdfText(text: string, config: SiteConfig, pdfUrl: string): ScrapedEventRaw[] {
+  const events: ScrapedEventRaw[] = [];
+  const lines = text.split(/\r?\n/);
+  const year = new Date().getFullYear().toString(); // PDFから年度取れればベストだがとりあえず現在年/configURLから
+
+  let currentMonth = "";
+
+  // 1行ずつ処理
+  // 日付パターン: "１２日", "２０(土)", "２６(土)～２７(日)"
+  const dayPattern = /^(\d{1,2}|[０-９]{1,2})\s*[(（]?[日月火水木金土][)）]?/;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // 月の判定: "４月", "10月"
+    const monthMatch = trimmed.match(/^(\d{1,2}|[０-９]{1,2})\s*月$/);
+    if (monthMatch) {
+      currentMonth = monthMatch[1].replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+      continue;
+    }
+
+    if (!currentMonth) continue;
+
+    // 行頭が日付で始まるか
+    // 全角数字対応
+    const normalizedLine = trimmed.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+    const dateMatch = normalizedLine.match(/^(\d{1,2})\s*[(（].*?[)）]/); // 12(土) または 12日(土)
+
+    // 日付のみで始まる行、または "13(土) イベント名" のような行
+    if (dateMatch) {
+      // 日付部分抽出
+      // 例: "２６(土)～２７(日) イベント..." -> "26", end="27"
+      // 例: "１３（土） ディスタンス..." -> "13"
+
+      // 日付範囲 "26(土)～27(日)"
+      const rangeMatch = normalizedLine.match(/^(\d{1,2}).*?[～〜~].*?(\d{1,2})/);
+      let dayStart = dateMatch[1];
+      let dayEnd: string | undefined;
+      let restOfLine = normalizedLine.substring(dateMatch[0].length).trim();
+
+      if (rangeMatch) {
+        dayStart = rangeMatch[1];
+        dayEnd = rangeMatch[2];
+        // 範囲マッチの場合、行末の日付部分以降をイベント名とする
+        // "26(土)～27(日)" の長さ分を除去だと正確でないかも
+        // シンプルに "～27(日)" の後ろを探す
+        const endPattern = new RegExp(`${dayEnd}.*?[\\)）]`);
+        const endM = normalizedLine.match(endPattern);
+        if (endM && endM.index !== undefined) {
+          restOfLine = normalizedLine.substring(endM.index + endM[0].length).trim();
+        }
+      }
+
+      // イベント名抽出
+      if (!restOfLine) continue; // 日付だけの行かも?
+
+      const eventName = restOfLine;
+
+      // 日付構築
+      const dateTextStart = `${year}-${currentMonth.padStart(2, "0")}-${dayStart.padStart(2, "0")}`;
+      let dateText = dateTextStart;
+      if (dayEnd) {
+        const dateTextEnd = `${year}-${currentMonth.padStart(2, "0")}-${dayEnd.padStart(2, "0")}`;
+        dateText = `${dateTextStart}~${dateTextEnd}`;
+      }
+
+      events.push({
+        name: eventName,
+        dateText,
+        detailUrl: pdfUrl, // 詳細URLはPDF自体とする
+        pdfUrl: pdfUrl
+      });
+    }
+  }
 
   return events;
 }
