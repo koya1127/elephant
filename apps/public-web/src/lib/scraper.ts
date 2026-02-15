@@ -409,12 +409,20 @@ function parseSapporo(
   });
 
   // 2. 要項ページからPDFリンクと正式名称を取得し、スケジュール情報とマージ
-  // 札幌陸協の構造: <h3 class="ttl-h3">大会名</h3> ... <ul class="link-list"><li><a>要項</a></li></ul>
-  $g(".ttl-h3").each((_, el) => {
+  // 札幌陸協の構造: <h3>大会名</h3> ... <ul class="doc-list"><li><a>要項PDF</a></li></ul>
+  $g("h3").each((_, el) => {
     const name = $g(el).text().trim();
-    // 次のulを探す
-    const nextUl = $g(el).nextAll("ul.link-list").first();
-    const pdfLink = nextUl.find("a").attr("href"); // 最初のリンクを要項とみなす
+    if (!name) return;
+    // 次のdoc-listを探す
+    const nextUl = $g(el).nextAll("ul.doc-list").first();
+    // 要項PDFリンク（"youkou"を含むか、最初のPDFリンク）
+    let pdfLink: string | undefined;
+    nextUl.find("a[href$='.pdf']").each((_, a) => {
+      const href = $g(a).attr("href") || "";
+      if (!pdfLink || href.includes("youkou")) {
+        pdfLink = href;
+      }
+    });
 
     // 名前でスケジュールを検索（完全一致しない場合が多いので部分一致推奨だが、一旦完全一致でtrial）
     // 札幌陸協は表記揺れが少ないが、スペース有無などでずれるかも
