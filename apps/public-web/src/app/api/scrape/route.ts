@@ -165,8 +165,12 @@ export async function POST(request: Request) {
     // 地域サイトの方が要項PDF等の詳細があるため優先
     deduplicateHokkaidoEvents(allResults, existing);
 
-    // 同じsourceIdのデータを更新
+    // 同じsourceIdのデータを更新（0件の場合は既存データを保持）
     for (const result of allResults) {
+      if (result.events.length === 0) {
+        console.log(`[Skip] ${result.sourceId}: 0 events scraped, keeping existing data`);
+        continue;
+      }
       const idx = existing.findIndex((e) => e.sourceId === result.sourceId);
       if (idx >= 0) {
         existing[idx] = result;

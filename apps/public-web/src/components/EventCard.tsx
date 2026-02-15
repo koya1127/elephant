@@ -49,10 +49,15 @@ export function EventCard({
             <div className={styles.eventName}>{event.name}</div>
             <div className={styles.meta}>
               {event.location && (
-                <span className={styles.metaItem}>
+                <a
+                  href={`https://www.google.com/maps/search/${encodeURIComponent(event.location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${styles.metaItem} ${styles.locationLink}`}
+                >
                   <span className={styles.metaIcon}>&#x1F4CD;</span>
                   {event.location}
-                </span>
+                </a>
               )}
               {event.maxEntries && (
                 <span className={styles.metaItem}>

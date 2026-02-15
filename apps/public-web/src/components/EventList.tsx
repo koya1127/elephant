@@ -5,6 +5,50 @@ import type { Event, ScrapeResult } from "@/lib/types";
 import { EventCard } from "./EventCard";
 import styles from "./EventList.module.css";
 
+/** sourceId → 表示名マッピング */
+const SOURCE_LABELS: Record<string, { short: string; region: string }> = {
+  sorachi: { short: "空知", region: "空知地方" },
+  kushiro: { short: "釧路", region: "釧路・根室" },
+  douo: { short: "道央", region: "道央" },
+  sapporo: { short: "札幌", region: "札幌市" },
+  hokkaido: { short: "北海道", region: "北海道全域" },
+  tokachi: { short: "十勝", region: "十勝地方" },
+  chuutairen: { short: "中体連", region: "北海道中学" },
+  koutairen: { short: "高体連", region: "北海道高校" },
+  gakuren: { short: "学連", region: "北海道大学" },
+  masters: { short: "マスターズ", region: "北海道" },
+  runnet: { short: "ランネット", region: "ロードレース" },
+};
+
+/** 競技場マッピング: event.location / event.name からマッチ */
+const VENUE_MAP: { id: string; label: string; keywords: string[] }[] = [
+  { id: "maruyama", label: "円山", keywords: ["円山"] },
+  { id: "hanasaki", label: "花咲", keywords: ["花咲"] },
+  { id: "aoba", label: "青葉(千歳)", keywords: ["青葉"] },
+  { id: "obihiro", label: "帯広の森", keywords: ["帯広の森"] },
+  { id: "irie", label: "入江(室蘭)", keywords: ["入江"] },
+  { id: "chiyodai", label: "千代台(函館)", keywords: ["千代台"] },
+  { id: "midorigaoka", label: "緑が丘(苫小牧)", keywords: ["緑が丘", "ヤクルト"] },
+  { id: "shibetsu", label: "士別", keywords: ["士別"] },
+  { id: "kushiro", label: "釧路", keywords: ["釧路市民"] },
+  { id: "abashiri", label: "網走", keywords: ["網走"] },
+  { id: "kitami", label: "北見(東陵)", keywords: ["東陵", "北見市"] },
+  { id: "fukagawa", label: "深川", keywords: ["深川市"] },
+  { id: "iwamizawa", label: "岩見沢", keywords: ["岩見沢", "東山公園"] },
+  { id: "hamanaka", label: "浜中(留萌)", keywords: ["浜中"] },
+  { id: "atsuma", label: "厚真", keywords: ["厚真"] },
+  { id: "shintoku", label: "新得", keywords: ["新得"] },
+  { id: "oval", label: "明治オーバル(帯広)", keywords: ["オーバル"] },
+];
+
+function matchVenue(event: Event): string | null {
+  const text = `${event.location || ""} ${event.name}`;
+  for (const venue of VENUE_MAP) {
+    if (venue.keywords.some((kw) => text.includes(kw))) return venue.id;
+  }
+  return null;
+}
+
 /** グレードを5大カテゴリに正規化 */
 function normalizeGradeCategory(raw: string): string {
   const s = raw.trim();
@@ -52,6 +96,7 @@ export function EventList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scraping, setScraping] = useState(false);
+  const [scrapingSites, setScrapingSites] = useState<Record<string, string>>({}); // siteId → status text
   const [adminKey, setAdminKey] = useState("");
   const [showAdmin, setShowAdmin] = useState(false);
 
@@ -60,6 +105,12 @@ export function EventList() {
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [selectedGrades, setSelectedGrades] = useState<Set<string>>(new Set());
   const [selectedDisciplines, setSelectedDisciplines] = useState<Set<string>>(
+    new Set()
+  );
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(
+    new Set()
+  );
+  const [selectedVenues, setSelectedVenues] = useState<Set<string>>(
     new Set()
   );
   const [showPastEvents, setShowPastEvents] = useState(false);
@@ -88,30 +139,48 @@ export function EventList() {
     }
   };
 
-  const handleScrape = async (skipPdf: boolean) => {
+  /** サイト別スクレイプ */
+  const handleScrapeSite = async (siteId: string, skipPdf: boolean) => {
     if (!adminKey) {
       setError("管理者キーを入力してください");
       return;
     }
+    const label = skipPdf ? "HTML取得中" : "PDF解析中";
+    setScrapingSites((prev) => ({ ...prev, [siteId]: label }));
+    setError(null);
     try {
-      setScraping(true);
-      setError(null);
-      const url = skipPdf ? "/api/scrape?skipPdf=true" : "/api/scrape";
-      const res = await fetch(url, {
+      const params = new URLSearchParams({ siteId });
+      if (skipPdf) params.set("skipPdf", "true");
+      const res = await fetch(`/api/scrape?${params}`, {
         method: "POST",
         headers: { "x-admin-key": adminKey },
         signal: AbortSignal.timeout(300_000),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "スクレイピングに失敗しました");
-      }
+      if (!res.ok) throw new Error(data.error || "失敗");
+      const count = data.results?.[0]?.events?.length ?? 0;
+      setScrapingSites((prev) => ({ ...prev, [siteId]: `${count}件 OK` }));
       await fetchEvents();
     } catch (err) {
-      setError(String(err));
-    } finally {
-      setScraping(false);
+      setScrapingSites((prev) => ({ ...prev, [siteId]: `エラー` }));
+      setError(`${siteId}: ${String(err)}`);
     }
+  };
+
+  /** 一括実行（順次） */
+  const handleScrapeAll = async (skipPdf: boolean) => {
+    if (!adminKey) {
+      setError("管理者キーを入力してください");
+      return;
+    }
+    setScraping(true);
+    setError(null);
+    const SKIP_SITES = ["douo", "koutairen"];
+    const sites = Object.keys(SOURCE_LABELS).filter((s) => !SKIP_SITES.includes(s));
+    for (const siteId of sites) {
+      await handleScrapeSite(siteId, skipPdf);
+    }
+    setScraping(false);
   };
 
   useEffect(() => {
@@ -123,10 +192,12 @@ export function EventList() {
     const months: Set<string> = new Set();
     const gradeCategories: Set<string> = new Set();
     const disciplines: Set<string> = new Set();
+    const sources: Set<string> = new Set();
 
     for (const event of events) {
       const [y, m] = event.date.split("-");
       months.add(`${y}-${m}`);
+      if (event.sourceId) sources.add(event.sourceId);
 
       for (const d of event.disciplines) {
         disciplines.add(d.name);
@@ -136,6 +207,13 @@ export function EventList() {
         }
       }
     }
+
+    const venueSet = new Set<string>();
+    for (const event of events) {
+      const vid = matchVenue(event);
+      if (vid) venueSet.add(vid);
+    }
+    const venues = VENUE_MAP.filter((v) => venueSet.has(v.id));
 
     const sortedMonths = Array.from(months).sort();
     const gradeOrder = ["一般", "高校", "中学", "小学生", "マスターズ"];
@@ -284,11 +362,20 @@ export function EventList() {
       .map(([category, items]) => ({ category, items }))
       .filter((g) => g.items.length > 0);
 
+    // Sort sources by the order defined in SOURCE_LABELS
+    const sourceOrder = Object.keys(SOURCE_LABELS);
+    const sortedSources = Array.from(sources).sort(
+      (a, b) => (sourceOrder.indexOf(a) === -1 ? 99 : sourceOrder.indexOf(a)) -
+                (sourceOrder.indexOf(b) === -1 ? 99 : sourceOrder.indexOf(b))
+    );
+
     return {
       months: sortedMonths,
       grades: sortedGrades,
-      disciplines: sortedDisciplines, // Keep flat list check logic if needed, or remove if unused in favor of groups
+      disciplines: sortedDisciplines,
       disciplineGroups,
+      sources: sortedSources,
+      venues,
     };
   }, [events]);
 
@@ -306,6 +393,15 @@ export function EventList() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         if (eventDate < today) return false;
+      }
+
+      if (selectedSources.size > 0) {
+        if (!selectedSources.has(event.sourceId)) return false;
+      }
+
+      if (selectedVenues.size > 0) {
+        const vid = matchVenue(event);
+        if (!vid || !selectedVenues.has(vid)) return false;
       }
 
       if (selectedGrades.size > 0) {
@@ -334,16 +430,18 @@ export function EventList() {
 
       return true;
     });
-  }, [events, selectedMonths, selectedGrades, selectedDisciplines]);
+  }, [events, selectedMonths, selectedGrades, selectedDisciplines, selectedSources, selectedVenues]);
 
   const activeFilterCount =
-    selectedMonths.size + selectedGrades.size + selectedDisciplines.size;
+    selectedMonths.size + selectedGrades.size + selectedDisciplines.size + selectedSources.size + selectedVenues.size;
   const hasActiveFilters = activeFilterCount > 0;
 
   const clearFilters = () => {
     setSelectedMonths(new Set());
     setSelectedGrades(new Set());
     setSelectedDisciplines(new Set());
+    setSelectedSources(new Set());
+    setSelectedVenues(new Set());
   };
 
   const toggleFilter = (
@@ -367,6 +465,10 @@ export function EventList() {
       toggleFilter(selectedGrades, setSelectedGrades, value);
     } else if (selectedDisciplines.has(value)) {
       toggleFilter(selectedDisciplines, setSelectedDisciplines, value);
+    } else if (selectedSources.has(value)) {
+      toggleFilter(selectedSources, setSelectedSources, value);
+    } else if (selectedVenues.has(value)) {
+      toggleFilter(selectedVenues, setSelectedVenues, value);
     }
   };
 
@@ -386,8 +488,16 @@ export function EventList() {
     for (const d of selectedDisciplines) {
       tags.push({ key: d, label: d });
     }
+    for (const s of selectedSources) {
+      const info = SOURCE_LABELS[s];
+      tags.push({ key: s, label: info ? info.short : s });
+    }
+    for (const v of selectedVenues) {
+      const venue = VENUE_MAP.find((vm) => vm.id === v);
+      tags.push({ key: v, label: venue ? venue.label : v });
+    }
     return tags;
-  }, [selectedMonths, selectedGrades, selectedDisciplines]);
+  }, [selectedMonths, selectedGrades, selectedDisciplines, selectedSources, selectedVenues]);
 
   const eventsByMonth = groupByMonth(filteredEvents);
 
@@ -412,23 +522,76 @@ export function EventList() {
             onChange={(e) => setAdminKey(e.target.value)}
             className={styles.adminInput}
           />
+
+          {/* サイト別コントロール */}
+          <div className={styles.siteGrid}>
+            {Object.entries(SOURCE_LABELS).map(([siteId, info]) => {
+              const isExternal = siteId === "douo" || siteId === "koutairen";
+              const status = scrapingSites[siteId];
+              const isBusy = status === "HTML取得中" || status === "PDF解析中";
+              return (
+                <div key={siteId} className={styles.siteRow}>
+                  <div className={styles.siteName}>
+                    <span className={styles.siteShort}>{info.short}</span>
+                    <span className={styles.siteRegion}>{info.region}</span>
+                  </div>
+                  {isExternal ? (
+                    <span className={styles.siteExternal}>専用スクリプト</span>
+                  ) : (
+                    <div className={styles.siteActions}>
+                      <button
+                        onClick={() => handleScrapeSite(siteId, true)}
+                        disabled={isBusy || scraping}
+                        className={styles.btnSmall}
+                      >
+                        {isBusy && status === "HTML取得中" ? <span className={styles.spinner} /> : null}
+                        HTML
+                      </button>
+                      <button
+                        onClick={() => handleScrapeSite(siteId, false)}
+                        disabled={isBusy || scraping}
+                        className={styles.btnSmallPrimary}
+                      >
+                        {isBusy && status === "PDF解析中" ? <span className={styles.spinner} /> : null}
+                        PDF
+                      </button>
+                    </div>
+                  )}
+                  {status && (
+                    <span className={
+                      status.includes("エラー") ? styles.siteStatusError :
+                      status.includes("OK") ? styles.siteStatusOk :
+                      styles.siteStatusBusy
+                    }>{status}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 一括実行 */}
           <div className={styles.toolbar}>
             <button
-              onClick={() => handleScrape(true)}
+              onClick={() => handleScrapeAll(true)}
               disabled={scraping}
               className={styles.btnLight}
             >
               {scraping && <span className={styles.spinner} />}
-              {scraping ? "取得中..." : "大会情報を更新"}
+              一括HTML取得
             </button>
             <button
-              onClick={() => handleScrape(false)}
+              onClick={() => handleScrapeAll(false)}
               disabled={scraping}
               className={styles.btnPrimary}
             >
               {scraping && <span className={styles.spinner} />}
-              {scraping ? "解析中..." : "PDF解析で詳細取得"}
+              一括PDF解析
             </button>
+            {scraping && (
+              <button onClick={() => setScraping(false)} className={styles.btnLight}>
+                中断
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -505,6 +668,59 @@ export function EventList() {
                   閉じる &times;
                 </button>
               </div>
+
+              {/* Source (陸協) filter */}
+              {filterOptions.sources.length > 0 && (
+                <details className={styles.filterGroup} open>
+                  <summary className={styles.filterLabel}>陸協・団体</summary>
+                  <div className={styles.filterChips}>
+                    {filterOptions.sources.map((s) => {
+                      const info = SOURCE_LABELS[s];
+                      return (
+                        <button
+                          key={s}
+                          className={
+                            selectedSources.has(s)
+                              ? styles.chipActive
+                              : styles.chip
+                          }
+                          onClick={() =>
+                            toggleFilter(selectedSources, setSelectedSources, s)
+                          }
+                          title={info?.region}
+                        >
+                          {info ? `${info.short}` : s}
+                          <span className={styles.chipSub}>{info?.region}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </details>
+              )}
+
+              {/* Venue (開催場所) filter */}
+              {filterOptions.venues.length > 0 && (
+                <details className={styles.filterGroup} open>
+                  <summary className={styles.filterLabel}>開催場所</summary>
+                  <div className={styles.filterChips}>
+                    {filterOptions.venues.map((v) => (
+                      <button
+                        key={v.id}
+                        className={
+                          selectedVenues.has(v.id)
+                            ? styles.chipActive
+                            : styles.chip
+                        }
+                        onClick={() =>
+                          toggleFilter(selectedVenues, setSelectedVenues, v.id)
+                        }
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
 
               {/* Month filter */}
               {filterOptions.months.length > 0 && (

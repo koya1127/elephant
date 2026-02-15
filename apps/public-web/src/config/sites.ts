@@ -1,5 +1,8 @@
 import type { SiteConfig } from "@/lib/types";
 
+const YEAR = new Date().getFullYear();
+const REIWA = YEAR - 2018; // 令和: 2025→r7, 2026→r8
+
 /**
  * 空知陸上競技協会
  * HTML: Shift_JIS, テーブル形式（月/日/曜日/大会名/要項PDF/申込書）
@@ -7,8 +10,8 @@ import type { SiteConfig } from "@/lib/types";
 export const sorachiConfig: SiteConfig = {
   id: "sorachi",
   name: "空知陸上競技協会",
-  url: "https://sorachi-rikkyo.com/event/2025/requirements.html",
-  baseUrl: "https://sorachi-rikkyo.com/event/2025/",
+  url: `https://sorachi-rikkyo.com/event/${YEAR}/requirements.html`,
+  baseUrl: `https://sorachi-rikkyo.com/event/${YEAR}/`,
   encoding: "shift_jis",
   parser: "sorachi",
   selectors: {
@@ -26,7 +29,7 @@ export const sorachiConfig: SiteConfig = {
 export const kushiroConfig: SiteConfig = {
   id: "kushiro",
   name: "釧路地方陸上競技協会",
-  url: "https://kushirorikujo.com/r7competitionschedule.html",
+  url: `https://kushirorikujo.com/r${REIWA}competitionschedule.html`,
   baseUrl: "https://kushirorikujo.com/",
   parser: "kushiro",
   selectors: {
@@ -101,8 +104,8 @@ export const hokkaidoConfig: SiteConfig = {
 export const tokachiConfig: SiteConfig = {
   id: "tokachi",
   name: "十勝陸上競技協会",
-  url: "https://tokachi-tf.sakura.ne.jp/2025/kako2025.html",
-  baseUrl: "https://tokachi-tf.sakura.ne.jp/2025/",
+  url: `https://tokachi-tf.sakura.ne.jp/${YEAR}/kako${YEAR}.html`,
+  baseUrl: `https://tokachi-tf.sakura.ne.jp/${YEAR}/`,
   encoding: "shift_jis",
   parser: "tokachi",
   selectors: {
