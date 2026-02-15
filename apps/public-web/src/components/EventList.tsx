@@ -69,7 +69,14 @@ export function EventList() {
       setLoading(true);
       const res = await fetch("/api/scrape");
       const data: ScrapeResult[] = await res.json();
-      const allEvents = data.flatMap((r) => r.events).map(sanitizeEvent);
+      const rawEvents = data.flatMap((r) => r.events).map(sanitizeEvent);
+      // ID重複を排除（先に出現したものを優先）
+      const seen = new Set<string>();
+      const allEvents = rawEvents.filter((e) => {
+        if (seen.has(e.id)) return false;
+        seen.add(e.id);
+        return true;
+      });
       allEvents.sort((a, b) => a.date.localeCompare(b.date));
       setEvents(allEvents);
       setError(null);
