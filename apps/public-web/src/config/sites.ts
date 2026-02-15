@@ -48,7 +48,6 @@ export const douoConfig: SiteConfig = {
   url: "https://www.douo-tandf.com/%E7%AB%B6%E6%8A%80%E4%BC%9A%E6%83%85%E5%A0%B1/",
   baseUrl: "https://www.douo-tandf.com/",
   parser: "douo",
-  useCurl: true,
   selectors: {
     eventRow: "",
     nameColumn: 0,
@@ -141,7 +140,6 @@ export const koutairenConfig: SiteConfig = {
   name: "北海道高体連陸上競技専門部",
   url: "https://www.doukoutairen-rikujyou.com/%E5%A4%A7%E4%BC%9A%E6%97%A5%E7%A8%8B/",
   baseUrl: "https://www.doukoutairen-rikujyou.com/",
-  useCurl: true,
   parser: "koutairen",
   selectors: {
     eventRow: "",
