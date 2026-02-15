@@ -30,4 +30,4 @@ jobs:
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: npx tsx scripts/scrape-cf-sites.ts
+        run: xvfb-run npx tsx scripts/scrape-cf-sites.ts

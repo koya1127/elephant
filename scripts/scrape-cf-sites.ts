@@ -351,11 +351,15 @@ async function parseKoutairen(html: string, baseUrl: string): Promise<ScrapedEve
 async function main() {
   console.log("=== Cloudflare Sites Scraper (GitHub Actions) ===\n");
 
-  // 1. Playwright でHTMLを取得
-  const browser = await chromium.launch();
+  // 1. Playwright でHTMLを取得（headed + xvfbでCloudflare回避）
+  const browser = await chromium.launch({
+    headless: false,
+    args: ["--disable-blink-features=AutomationControlled"],
+  });
   const context = await browser.newContext({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    viewport: { width: 1920, height: 1080 },
   });
 
   const htmlMap = new Map<string, string>();
