@@ -139,20 +139,18 @@ async function parseEventsFromHtml(
       }
     });
   } else if (config.parser === "kushiro") {
-    // 釧路: テーブル形式
+    // 釧路: テーブル形式（日付は<th>、大会名・PDF等は<td>）
     $(config.selectors.eventRow).each((_, el) => {
       const tds = $(el).find("td");
+      const ths = $(el).find("th");
       if (tds.length === 0) return;
 
-      const dateText = $(tds[config.selectors.dateColumn as number])
-        .text()
-        .trim();
-      const name = $(tds[config.selectors.nameColumn as number])
-        .text()
-        .trim();
-      const pdfLink = $(tds[config.selectors.pdfLinkColumn as number])
-        .find("a")
-        .attr("href");
+      // 日付は<th>に入っている
+      const dateText = ths.length > 0 ? $(ths[0]).text().trim() : "";
+      const name = $(tds[0]).text().trim();
+      const pdfLink = tds.length > 1
+        ? $(tds[1]).find("a").attr("href") || $(tds[2]).find("a").attr("href")
+        : undefined;
 
       if (dateText && name) {
         const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
