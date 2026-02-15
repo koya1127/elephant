@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { scrapeEvents } from "@/lib/scraper";
+import { siteConfigs } from "@/config/sites";
 
 export async function GET(request: Request) {
   const adminKey = request.headers.get("x-admin-key");
@@ -7,9 +9,35 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
+  const siteId = searchParams.get("siteId");
+
+  if (siteId) {
+    // 特定サイトのスクレイパーをテスト
+    const config = siteConfigs.find((c) => c.id === siteId);
+    if (!config) {
+      return NextResponse.json({ error: `Site not found: ${siteId}` }, { status: 404 });
+    }
+
+    try {
+      const events = await scrapeEvents(config);
+      return NextResponse.json({
+        siteId,
+        eventCount: events.length,
+        events: events.slice(0, 5),
+      });
+    } catch (e) {
+      return NextResponse.json({
+        siteId,
+        error: String(e),
+        stack: e instanceof Error ? e.stack : undefined,
+      });
+    }
+  }
+
+  // URL直接テスト
   const url = searchParams.get("url");
   if (!url) {
-    return NextResponse.json({ error: "url required" }, { status: 400 });
+    return NextResponse.json({ error: "siteId or url required" }, { status: 400 });
   }
 
   try {
@@ -25,14 +53,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       status: res.status,
-      statusText: res.statusText,
-      headers: Object.fromEntries(res.headers.entries()),
       bodyLength: buffer.byteLength,
       bodyPreview: text.slice(0, 500),
     });
   } catch (e) {
-    return NextResponse.json({
-      error: String(e),
-    });
+    return NextResponse.json({ error: String(e) });
   }
 }
