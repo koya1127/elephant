@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { scrapeEvents } from "@/lib/scraper";
-import { siteConfigs } from "@/config/sites";
+
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 export async function GET(request: Request) {
   const adminKey = request.headers.get("x-admin-key");
@@ -8,30 +9,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const siteId = searchParams.get("siteId") || "kushiro";
+  const urls = [
+    "https://www.douo-tandf.com/%E7%AB%B6%E6%8A%80%E4%BC%9A%E6%83%85%E5%A0%B1/",
+    "https://www.doukoutairen-rikujyou.com/%E5%A4%A7%E4%BC%9A%E6%97%A5%E7%A8%8B/",
+  ];
 
-  const config = siteConfigs.find((c) => c.id === siteId);
-  if (!config) {
-    return NextResponse.json({ error: `Site not found: ${siteId}` }, { status: 404 });
+  const results = [];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { headers: { "User-Agent": UA } });
+      const text = await res.text();
+      results.push({
+        url,
+        status: res.status,
+        bodyLength: text.length,
+        preview: text.slice(0, 300),
+      });
+    } catch (e) {
+      results.push({ url, error: String(e) });
+    }
   }
 
-  try {
-    const events = await scrapeEvents(config);
-    return NextResponse.json({
-      siteId,
-      eventCount: events.length,
-      first5: events.slice(0, 5).map((e) => ({
-        name: e.name,
-        dateText: e.dateText,
-        pdfUrl: e.pdfUrl,
-      })),
-    });
-  } catch (e) {
-    return NextResponse.json({
-      siteId,
-      error: String(e),
-      stack: e instanceof Error ? e.stack?.split("\n").slice(0, 5) : undefined,
-    });
-  }
+  return NextResponse.json(results);
 }
