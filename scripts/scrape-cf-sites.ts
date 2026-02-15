@@ -361,7 +361,20 @@ async function main() {
     const page = await context.newPage();
     try {
       await page.goto(site.url, { waitUntil: "domcontentloaded", timeout: 60000 });
-      // Jimdoサイトはクライアントサイドレンダリングがあるので少し待つ
+
+      // Cloudflare Turnstileチャレンジを通過するのを待つ
+      // タイトルが "Just a moment..." から変わるか、__WEBSITE_PROPS__ が出現するのを待つ
+      try {
+        await page.waitForFunction(
+          () => !document.title.includes("Just a moment"),
+          { timeout: 30000 }
+        );
+        console.log(`[Playwright] Passed Cloudflare challenge for ${site.id}`);
+      } catch {
+        console.warn(`[Playwright] Cloudflare challenge did not resolve for ${site.id}`);
+      }
+
+      // Jimdoサイトはクライアントサイドレンダリングがあるので追加で待つ
       await page.waitForTimeout(5000);
       const html = await page.content();
       htmlMap.set(site.id, html);
