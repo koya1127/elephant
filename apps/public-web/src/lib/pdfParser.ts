@@ -75,7 +75,13 @@ export async function parsePdfWithClaude(
     jsonStr = codeBlockMatch[1].trim();
   }
 
-  const raw = JSON.parse(jsonStr);
+  let raw;
+  try {
+    raw = JSON.parse(jsonStr);
+  } catch (e) {
+    console.error(`[PDF] Failed to parse Claude response: ${jsonStr.slice(0, 200)}`);
+    return { location: "", disciplines: [] };
+  }
   return normalizePdfResult(raw);
 }
 
@@ -219,7 +225,13 @@ export async function parseSchedulePdfWithClaude(
     jsonStr = jsonStr.substring(arrStart, arrEnd + 1);
   }
 
-  const raw = JSON.parse(jsonStr);
+  let raw;
+  try {
+    raw = JSON.parse(jsonStr);
+  } catch (e) {
+    console.error(`[SchedulePDF] Failed to parse Claude response: ${jsonStr.slice(0, 200)}`);
+    return [];
+  }
   if (!Array.isArray(raw)) {
     throw new Error("Expected JSON array from Claude API");
   }
@@ -280,6 +292,12 @@ export async function parseExcelWithClaude(
     jsonStr = codeBlockMatch[1].trim();
   }
 
-  const raw = JSON.parse(jsonStr);
+  let raw;
+  try {
+    raw = JSON.parse(jsonStr);
+  } catch (e) {
+    console.error(`[Excel] Failed to parse Claude response: ${jsonStr.slice(0, 200)}`);
+    return { location: "", disciplines: [] };
+  }
   return normalizePdfResult(raw);
 }

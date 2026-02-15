@@ -216,7 +216,7 @@ export async function GET() {
 function generateId(name: string, date: string, sourceId: string): string {
   const slug = name
     .replace(/[^\w\u3000-\u9FFF]/g, "")
-    .slice(0, 20);
+    .slice(0, 30);
   return `${sourceId}-${date}-${slug}`;
 }
 

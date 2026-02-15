@@ -747,7 +747,16 @@ async function parseRunnet(
     console.log("[Runnet] No page 2 or fetch failed:", e);
   }
 
-  return events;
+  // ページ間の重複排除（同一名+同一日付）
+  const seen = new Set<string>();
+  const deduped = events.filter((e) => {
+    const key = `${e.dateText}-${e.name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return deduped;
 }
 
 function parseRunnetPage(
