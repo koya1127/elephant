@@ -87,56 +87,58 @@ async function parseEventsFromHtml(
   const $ = cheerio.load(html);
 
   if (config.parser === "sorachi") {
-    // 空知: テーブル形式
+    // 空知: テーブル形式（月と日が別セル、月列はrowspan）
+    // td=6: [月, 日, 曜, 大会名, 要項, 申込] ← 月の最初の行
+    // td=5: [日, 曜, 大会名, 要項, 申込] ← 同月の続き行
+    const year = 2025;
+    let currentMonth = "";
     $(config.selectors.eventRow).each((_, el) => {
       const tds = $(el).find("td");
-      if (tds.length === 0) return;
+      if (tds.length < 5) return;
 
-      const dateText = $(tds[config.selectors.dateColumn as number])
-        .text()
-        .trim();
-      const name = $(tds[config.selectors.nameColumn as number])
-        .text()
-        .trim();
-      // PDFリンク
-      const pdfLink = $(tds[config.selectors.pdfLinkColumn as number])
-        .find("a")
-        .attr("href");
-
-      if (dateText && name) {
-        // 全角英数字を半角に
-        const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
-          String.fromCharCode(s.charCodeAt(0) - 0xfee0)
-        );
-
-        // 日付フォーマット整形 (例: 4月10日 -> 2025-04-10)
-        // 空知は "4/12", "5/3-4" のような形式
-        const year = 2025; // TODO: ページから年度取得
-        const dateMatch = normalizedDate.match(/(\d+)\/(\d+)(?:-(\d+))?/);
-
-        if (dateMatch) {
-          const month = dateMatch[1].padStart(2, "0");
-          const day = dateMatch[2].padStart(2, "0");
-          const endDay = dateMatch[3] ? dateMatch[3].padStart(2, "0") : null;
-          const dateStr = endDay
-            ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
-            : `${year}-${month}-${day}`;
-
-          const detailUrl = pdfLink
-            ? new URL(pdfLink, config.baseUrl).toString()
-            : config.url;
-
-          // 除外条件（タイトル行など）
-          if (name === "大会名") return;
-
-          events.push({
-            name,
-            dateText: dateStr,
-            pdfUrl: detailUrl.endsWith(".pdf") ? detailUrl : undefined,
-            detailUrl,
-          });
-        }
+      let month: string, day: string, name: string, pdfLink: string | undefined;
+      if (tds.length >= 6) {
+        // 月の最初の行
+        currentMonth = $(tds[0]).text().trim();
+        day = $(tds[1]).text().trim();
+        name = $(tds[3]).text().trim();
+        pdfLink = $(tds[4]).find("a").attr("href");
+      } else {
+        // 同月の続き行
+        day = $(tds[0]).text().trim();
+        name = $(tds[2]).text().trim();
+        pdfLink = $(tds[3]).find("a").attr("href");
       }
+      month = currentMonth;
+
+      if (!month || !day || !name) return;
+      if (name === "大会名") return;
+
+      // 全角→半角
+      month = month.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
+      day = day.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
+
+      // 日の範囲対応 "3-4" → dateEnd
+      const dayMatch = day.match(/(\d+)(?:-(\d+))?/);
+      if (!dayMatch) return;
+
+      const dayStart = dayMatch[1].padStart(2, "0");
+      const dayEnd = dayMatch[2] ? dayMatch[2].padStart(2, "0") : null;
+      const monthPad = month.padStart(2, "0");
+      const dateStr = dayEnd
+        ? `${year}-${monthPad}-${dayStart}~${year}-${monthPad}-${dayEnd}`
+        : `${year}-${monthPad}-${dayStart}`;
+
+      const detailUrl = pdfLink
+        ? new URL(pdfLink, config.baseUrl).toString()
+        : config.url;
+
+      events.push({
+        name,
+        dateText: dateStr,
+        pdfUrl: detailUrl.endsWith(".pdf") ? detailUrl : undefined,
+        detailUrl,
+      });
     });
   } else if (config.parser === "kushiro") {
     // 釧路: テーブル形式（日付は<th>、大会名・PDF等は<td>）
@@ -375,25 +377,33 @@ function parseSapporo(
   // 1. スケジュールから基本情報を取得
   const scheduleMap = new Map<string, { date: string; location: string }>();
 
+  // 札幌スケジュール: 月列にrowspanあり
+  // td=5: [月, 日, 曜, 大会名, 会場] ← 月の最初の行
+  // td=4: [日, 曜, 大会名, 会場] ← 同月の続き行
+  // td=2～3: 備考行など
+  let currentMonth = "";
   $s(config.selectors.eventRow).each((_, el) => {
     const tds = $s(el).find("td");
-    if (tds.length < 5) return;
+    if (tds.length < 4) return;
 
-    const month = $s(tds[0]).text().trim(); // "4"
-    const day = $s(tds[1]).text().trim(); // "29"
-    // const wday = $s(tds[2]).text().trim();
-    const name = $s(tds[3]).text().trim();
-    const location = $s(tds[4]).text().trim();
+    let month: string, day: string, name: string, location: string;
+    if (tds.length >= 5) {
+      currentMonth = $s(tds[0]).text().trim();
+      day = $s(tds[1]).text().trim();
+      name = $s(tds[3]).text().trim();
+      location = $s(tds[4]).text().trim();
+    } else {
+      day = $s(tds[0]).text().trim();
+      name = $s(tds[2]).text().trim();
+      location = tds.length >= 4 ? $s(tds[3]).text().trim() : "";
+    }
+    month = currentMonth;
 
     if (month && day && name) {
-      // 日付の正規化 (範囲は対応が難しいので開始日のみ)
       const dayClean = day.split("～")[0].split("~")[0].replace(/\D/g, "");
-      const year = 2025; // 簡易
-      const dateStr = `${year}-${month.padStart(2, "0")}-${dayClean.padStart(
-        2,
-        "0"
-      )}`;
-
+      if (!dayClean) return;
+      const year = 2025;
+      const dateStr = `${year}-${month.padStart(2, "0")}-${dayClean.padStart(2, "0")}`;
       scheduleMap.set(name, { date: dateStr, location });
     }
   });
