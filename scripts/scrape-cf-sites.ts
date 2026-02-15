@@ -1,18 +1,15 @@
 /**
- * GitHub Actions用スクリプト: Cloudflare保護サイト（douo, koutairen）のスクレイピング
+ * GitHub Actions用スクリプト: koutairen（高体連）のスクレイピング
  *
- * - douo: curl-impersonate（Chrome TLSフィンガープリント模倣）でHTML取得
- * - koutairen: Playwright + stealth でHTML取得
- * 既存パーサーでイベント抽出後、Vercel Blobの既存データにマージして書き戻す。
+ * Playwright + stealth でHTML取得 → スケジュールPDFをClaude解析 → Vercel Blobにマージ
  *
  * 環境変数:
  *   BLOB_READ_WRITE_TOKEN — Vercel Blob読み書きトークン
- *   ANTHROPIC_API_KEY     — Claude API（koutairenのPDF解析用）
+ *   ANTHROPIC_API_KEY     — Claude API（PDF解析用）
  *
  * 実行: npx tsx scripts/scrape-cf-sites.ts
  */
 
-import { execSync } from "child_process";
 import { chromium } from "playwright-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as cheerio from "cheerio";
@@ -88,7 +85,7 @@ async function writeToBlob(data: ScrapeResult[]): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// ID生成
+// Helpers
 // ---------------------------------------------------------------------------
 
 function generateId(name: string, date: string, sourceId: string): string {
@@ -172,122 +169,6 @@ async function parseSchedulePdf(pdfBuffer: Buffer): Promise<ScheduleEvent[]> {
 }
 
 // ---------------------------------------------------------------------------
-// HTML取得: curl-impersonate（douo用）
-// ---------------------------------------------------------------------------
-
-function fetchWithCurlImpersonate(url: string): string {
-  try {
-    const cmd = `curl_chrome116 -s -L "${url}"`;
-    console.log(`[curl-impersonate] ${cmd}`);
-    const result = execSync(cmd, { timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
-    return result.toString("utf-8");
-  } catch (e) {
-    console.error(`[curl-impersonate] Failed:`, e);
-    return "";
-  }
-}
-
-// ---------------------------------------------------------------------------
-// HTML取得: Playwright（koutairen用）
-// ---------------------------------------------------------------------------
-
-async function fetchWithPlaywright(url: string, siteId: string): Promise<string> {
-  const browser = await chromium.launch({
-    headless: false,
-    args: ["--disable-blink-features=AutomationControlled"],
-  });
-  const context = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    viewport: { width: 1920, height: 1080 },
-  });
-
-  let html = "";
-  const page = await context.newPage();
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-
-    // Cloudflare Turnstile待ち
-    const title = await page.title();
-    if (title.includes("Just a moment")) {
-      console.log(`[Playwright] Cloudflare challenge for ${siteId}, waiting...`);
-      try {
-        await page.waitForFunction(
-          () => !document.title.includes("Just a moment"),
-          { timeout: 30000 }
-        );
-        console.log(`[Playwright] Passed Cloudflare for ${siteId}`);
-      } catch {
-        console.warn(`[Playwright] Cloudflare did not resolve for ${siteId}`);
-      }
-    }
-
-    await page.waitForTimeout(5000);
-    html = await page.content();
-  } catch (e) {
-    console.error(`[Playwright] Failed for ${siteId}:`, e);
-  } finally {
-    await page.close();
-    await browser.close();
-  }
-
-  return html;
-}
-
-// ---------------------------------------------------------------------------
-// Douo パーサー
-// ---------------------------------------------------------------------------
-
-function parseDouo(html: string): ScrapedEventRaw[] {
-  const events: ScrapedEventRaw[] = [];
-  const $ = cheerio.load(html);
-
-  // cheerioセレクタで試行
-  $(".j-module.n.j-text p").each((_, el) => {
-    const text = $(el).text().trim();
-    const match = text.match(
-      /(\d{4})年\s*(\d{1,2})月(\d{1,2})日(?:[(（].*?[)）])?(?:\s*～\s*(\d{1,2})日)?\s*(.*)/
-    );
-    if (match) {
-      const year = match[1];
-      const month = match[2].padStart(2, "0");
-      const day = match[3].padStart(2, "0");
-      const endDay = match[4] ? match[4].padStart(2, "0") : null;
-      const name = match[5].trim();
-      const dateStr = endDay
-        ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
-        : `${year}-${month}-${day}`;
-      events.push({ name, dateText: dateStr, detailUrl: "https://www.douo-tandf.com/" });
-    }
-  });
-
-  // フォールバック: bodyテキスト全体から行分割パース
-  if (events.length === 0) {
-    console.log("[Douo] CSS selectors found nothing, trying full-text parse");
-    const bodyText = $("body").text();
-    for (const line of bodyText.split(/\n/)) {
-      const match = line.trim().match(
-        /(\d{4})年\s*(\d{1,2})月(\d{1,2})日(?:[(（].*?[)）])?(?:\s*～\s*(\d{1,2})日)?\s+(.*)/
-      );
-      if (match) {
-        const year = match[1];
-        const month = match[2].padStart(2, "0");
-        const day = match[3].padStart(2, "0");
-        const endDay = match[4] ? match[4].padStart(2, "0") : null;
-        const name = match[5].trim();
-        if (!name) continue;
-        const dateStr = endDay
-          ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
-          : `${year}-${month}-${day}`;
-        events.push({ name, dateText: dateStr, detailUrl: "https://www.douo-tandf.com/" });
-      }
-    }
-  }
-
-  return events;
-}
-
-// ---------------------------------------------------------------------------
 // Koutairen パーサー
 // ---------------------------------------------------------------------------
 
@@ -297,7 +178,6 @@ async function parseKoutairen(html: string, baseUrl: string): Promise<ScrapedEve
 
   let pdfUrl: string | undefined;
 
-  // 方法1: <a>タグから.pdfリンク検索
   $("a").each((_, el) => {
     const href = $(el).attr("href") || "";
     if (href.includes(".pdf") && (href.includes("大会") || href.includes("日程") || href.includes("schedule"))) {
@@ -306,7 +186,6 @@ async function parseKoutairen(html: string, baseUrl: string): Promise<ScrapedEve
     }
   });
 
-  // 方法2: __WEBSITE_PROPS__ JSONからPDFリンク抽出
   if (!pdfUrl) {
     const startIdx = html.indexOf("window.__WEBSITE_PROPS__");
     if (startIdx !== -1) {
@@ -327,7 +206,6 @@ async function parseKoutairen(html: string, baseUrl: string): Promise<ScrapedEve
     }
   }
 
-  // 方法3: download系リンク
   if (!pdfUrl) {
     $("a").each((_, el) => {
       const href = $(el).attr("href") || "";
@@ -367,112 +245,96 @@ async function parseKoutairen(html: string, baseUrl: string): Promise<ScrapedEve
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log("=== Cloudflare Sites Scraper (GitHub Actions) ===\n");
+  console.log("=== Koutairen Scraper (GitHub Actions) ===\n");
 
-  const allNewResults: ScrapeResult[] = [];
+  const url = "https://www.doukoutairen-rikujyou.com/%E5%A4%A7%E4%BC%9A%E6%97%A5%E7%A8%8B/";
+  const baseUrl = "https://www.doukoutairen-rikujyou.com/";
 
-  // --- douo: curl-impersonate ---
-  {
-    const url = "https://www.douo-tandf.com/%E7%AB%B6%E6%8A%80%E4%BC%9A%E6%83%85%E5%A0%B1/";
-    console.log(`[douo] Fetching with curl-impersonate...`);
-    const html = fetchWithCurlImpersonate(url);
-    console.log(`[douo] Got ${html.length} chars`);
-    console.log(`[douo] HTML snippet: ${html.slice(0, 500)}`);
-    console.log(`[douo] Has __WEBSITE_PROPS__: ${html.includes("__WEBSITE_PROPS__")}`);
+  // Playwright でHTML取得
+  const browser = await chromium.launch({
+    headless: false,
+    args: ["--disable-blink-features=AutomationControlled"],
+  });
+  const context = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    viewport: { width: 1920, height: 1080 },
+  });
 
-    if (html) {
-      const rawEvents = parseDouo(html);
-      console.log(`[douo] Parsed ${rawEvents.length} events`);
-
-      const events: Event[] = rawEvents.map((raw) => {
-        const [dateStart, dateEnd] = raw.dateText.includes("~")
-          ? raw.dateText.split("~")
-          : [raw.dateText, undefined];
-        return {
-          id: generateId(raw.name, dateStart, "douo"),
-          name: raw.name,
-          date: dateStart,
-          dateEnd,
-          location: extractLocationFromName(raw.name),
-          disciplines: [],
-          detailUrl: raw.detailUrl || url,
-          sourceId: "douo",
-        };
-      });
-
-      allNewResults.push({
-        sourceId: "douo",
-        scrapedAt: new Date().toISOString(),
-        events,
-      });
+  const page = await context.newPage();
+  let html = "";
+  try {
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+    const title = await page.title();
+    if (title.includes("Just a moment")) {
+      console.log("[Playwright] Cloudflare challenge detected, waiting...");
+      try {
+        await page.waitForFunction(
+          () => !document.title.includes("Just a moment"),
+          { timeout: 30000 }
+        );
+        console.log("[Playwright] Passed Cloudflare challenge");
+      } catch {
+        console.warn("[Playwright] Cloudflare challenge did not resolve");
+      }
     }
+    await page.waitForTimeout(5000);
+    html = await page.content();
+    console.log(`[Playwright] Got ${html.length} chars`);
+  } finally {
+    await page.close();
+    await browser.close();
   }
 
-  // --- koutairen: Playwright ---
-  {
-    const url = "https://www.doukoutairen-rikujyou.com/%E5%A4%A7%E4%BC%9A%E6%97%A5%E7%A8%8B/";
-    const baseUrl = "https://www.doukoutairen-rikujyou.com/";
-    console.log(`[koutairen] Fetching with Playwright...`);
-    const html = await fetchWithPlaywright(url, "koutairen");
-    console.log(`[koutairen] Got ${html.length} chars`);
-
-    if (html) {
-      const rawEvents = await parseKoutairen(html, baseUrl);
-      console.log(`[koutairen] Parsed ${rawEvents.length} events`);
-
-      const events: Event[] = rawEvents.map((raw) => {
-        const [dateStart, dateEnd] = raw.dateText.includes("~")
-          ? raw.dateText.split("~")
-          : [raw.dateText, undefined];
-        return {
-          id: generateId(raw.name, dateStart, "koutairen"),
-          name: raw.name,
-          date: dateStart,
-          dateEnd,
-          location: extractLocationFromName(raw.name),
-          disciplines: [],
-          detailUrl: raw.detailUrl || url,
-          sourceId: "koutairen",
-        };
-      });
-
-      allNewResults.push({
-        sourceId: "koutairen",
-        scrapedAt: new Date().toISOString(),
-        events,
-      });
-    }
+  if (!html) {
+    console.error("No HTML, aborting");
+    process.exit(1);
   }
 
-  // --- Vercel Blob マージ ---
+  // パース
+  const rawEvents = await parseKoutairen(html, baseUrl);
+  console.log(`[koutairen] Parsed ${rawEvents.length} events`);
+
+  const events: Event[] = rawEvents.map((raw) => {
+    const [dateStart, dateEnd] = raw.dateText.includes("~")
+      ? raw.dateText.split("~")
+      : [raw.dateText, undefined];
+    return {
+      id: generateId(raw.name, dateStart, "koutairen"),
+      name: raw.name,
+      date: dateStart,
+      dateEnd,
+      location: extractLocationFromName(raw.name),
+      disciplines: [],
+      detailUrl: raw.detailUrl || url,
+      sourceId: "koutairen",
+    };
+  });
+
+  const result: ScrapeResult = {
+    sourceId: "koutairen",
+    scrapedAt: new Date().toISOString(),
+    events,
+  };
+
+  // Vercel Blob マージ
   console.log("\n[Blob] Reading existing data...");
   const existing = await readFromBlob();
-  console.log(`[Blob] Found ${existing.length} existing site results`);
-
-  for (const result of allNewResults) {
-    const idx = existing.findIndex((e) => e.sourceId === result.sourceId);
-    if (idx >= 0) {
-      console.log(
-        `[Blob] Replacing ${result.sourceId}: ${existing[idx].events.length} → ${result.events.length} events`
-      );
-      existing[idx] = result;
-    } else {
-      console.log(`[Blob] Adding new: ${result.sourceId} (${result.events.length} events)`);
-      existing.push(result);
-    }
+  const idx = existing.findIndex((e) => e.sourceId === "koutairen");
+  if (idx >= 0) {
+    console.log(`[Blob] Replacing koutairen: ${existing[idx].events.length} → ${events.length} events`);
+    existing[idx] = result;
+  } else {
+    console.log(`[Blob] Adding koutairen: ${events.length} events`);
+    existing.push(result);
   }
 
-  console.log("[Blob] Writing updated data...");
+  console.log("[Blob] Writing...");
   await writeToBlob(existing);
 
-  // サマリー
-  const total = allNewResults.reduce((s, r) => s + r.events.length, 0);
-  console.log(`\n=== Done: ${total} events from ${allNewResults.length} CF sites ===`);
-  for (const r of allNewResults) {
-    console.log(`  ${r.sourceId}: ${r.events.length} events`);
-    for (const e of r.events) {
-      console.log(`    - ${e.date} ${e.name}`);
-    }
+  console.log(`\n=== Done: koutairen ${events.length} events ===`);
+  for (const e of events) {
+    console.log(`  - ${e.date} ${e.name}`);
   }
 }
 
