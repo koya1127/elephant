@@ -56,8 +56,12 @@ async function fetchHtml(
 }
 
 function fetchHtmlWithCurl(url: string): string {
+  // Vercelではcurlが使えないため空文字を返す（Cloudflare保護サイト用）
+  if (process.env.VERCEL) {
+    console.log(`[Curl] Skipped on Vercel: ${url}`);
+    return "";
+  }
   try {
-    // 403回避のための簡易策 (User-Agent偽装)
     const cmd = `curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "${url}"`;
     return execSync(cmd).toString();
   } catch (e) {
