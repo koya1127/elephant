@@ -377,6 +377,8 @@ async function main() {
     console.log(`[douo] Fetching with curl-impersonate...`);
     const html = fetchWithCurlImpersonate(url);
     console.log(`[douo] Got ${html.length} chars`);
+    console.log(`[douo] HTML snippet: ${html.slice(0, 500)}`);
+    console.log(`[douo] Has __WEBSITE_PROPS__: ${html.includes("__WEBSITE_PROPS__")}`);
 
     if (html) {
       const rawEvents = parseDouo(html);
