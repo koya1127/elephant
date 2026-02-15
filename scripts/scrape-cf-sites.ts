@@ -11,10 +11,14 @@
  * 実行: npx tsx scripts/scrape-cf-sites.ts
  */
 
-import { chromium } from "playwright";
+import { chromium } from "playwright-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as cheerio from "cheerio";
 import { list, put } from "@vercel/blob";
 import Anthropic from "@anthropic-ai/sdk";
+
+// Stealth: WebDriver検出、navigator.plugins偽装等を有効化
+chromium.use(StealthPlugin());
 
 // ---------------------------------------------------------------------------
 // Types (apps/public-web/src/lib/types.ts から必要なもの)
