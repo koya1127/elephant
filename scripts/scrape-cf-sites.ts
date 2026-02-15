@@ -195,6 +195,25 @@ function parseDouo(html: string): ScrapedEventRaw[] {
   const events: ScrapedEventRaw[] = [];
   const $ = cheerio.load(html);
 
+  // デバッグ: テキスト全体から日付パターンを検索
+  const bodyText = $("body").text();
+  const dateMatches = bodyText.match(/\d{4}年\s*\d{1,2}月\d{1,2}日/g);
+  console.log(`[Douo] Date patterns in body text: ${dateMatches?.length ?? 0}`);
+  if (dateMatches) console.log(`[Douo] Sample: ${dateMatches.slice(0, 3).join(", ")}`);
+
+  // Jimdo CSR: クラス名が異なる可能性があるので複数セレクタを試す
+  const selectors = [
+    ".j-module.n.j-text p",
+    ".j-text p",
+    "[class*='j-text'] p",
+    "p",
+  ];
+  for (const sel of selectors) {
+    const count = $(sel).length;
+    if (count > 0) console.log(`[Douo] Selector "${sel}": ${count} elements`);
+  }
+
+  // 元のセレクタで試行
   $(".j-module.n.j-text p").each((_, el) => {
     const text = $(el).text().trim();
     const match = text.match(
@@ -212,6 +231,30 @@ function parseDouo(html: string): ScrapedEventRaw[] {
       events.push({ name, dateText: dateStr, detailUrl: "https://www.douo-tandf.com/" });
     }
   });
+
+  // フォールバック: セレクタで見つからなければbodyテキスト全体を行分割してパース
+  if (events.length === 0) {
+    console.log("[Douo] Falling back to full-text parsing");
+    const lines = bodyText.split(/\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const match = trimmed.match(
+        /(\d{4})年\s*(\d{1,2})月(\d{1,2})日(?:[(（].*?[)）])?(?:\s*～\s*(\d{1,2})日)?\s+(.*)/
+      );
+      if (match) {
+        const year = match[1];
+        const month = match[2].padStart(2, "0");
+        const day = match[3].padStart(2, "0");
+        const endDay = match[4] ? match[4].padStart(2, "0") : null;
+        const name = match[5].trim();
+        if (!name) continue;
+        const dateStr = endDay
+          ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
+          : `${year}-${month}-${day}`;
+        events.push({ name, dateText: dateStr, detailUrl: "https://www.douo-tandf.com/" });
+      }
+    }
+  }
 
   return events;
 }
