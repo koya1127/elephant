@@ -366,16 +366,33 @@ async function main() {
     try {
       await page.goto(site.url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
-      // Cloudflare Turnstileチャレンジを通過するのを待つ
-      // タイトルが "Just a moment..." から変わるか、__WEBSITE_PROPS__ が出現するのを待つ
-      try {
-        await page.waitForFunction(
-          () => !document.title.includes("Just a moment"),
-          { timeout: 30000 }
-        );
-        console.log(`[Playwright] Passed Cloudflare challenge for ${site.id}`);
-      } catch {
-        console.warn(`[Playwright] Cloudflare challenge did not resolve for ${site.id}`);
+      // Cloudflare Turnstileチャレンジを通過する
+      const title = await page.title();
+      if (title.includes("Just a moment")) {
+        console.log(`[Playwright] Cloudflare challenge detected for ${site.id}, attempting to solve...`);
+
+        // Turnstile iframe内のチェックボックスをクリック
+        try {
+          const turnstileFrame = page.frameLocator('iframe[src*="challenges.cloudflare.com"]');
+          const checkbox = turnstileFrame.locator('input[type="checkbox"], .cb-lb');
+          await checkbox.click({ timeout: 10000 });
+          console.log(`[Playwright] Clicked Turnstile checkbox for ${site.id}`);
+        } catch {
+          console.log(`[Playwright] No clickable Turnstile checkbox for ${site.id}, waiting...`);
+        }
+
+        // チャレンジ通過を待つ
+        try {
+          await page.waitForFunction(
+            () => !document.title.includes("Just a moment"),
+            { timeout: 30000 }
+          );
+          console.log(`[Playwright] Passed Cloudflare challenge for ${site.id}`);
+        } catch {
+          console.warn(`[Playwright] Cloudflare challenge did not resolve for ${site.id}`);
+        }
+      } else {
+        console.log(`[Playwright] No Cloudflare challenge for ${site.id}`);
       }
 
       // Jimdoサイトはクライアントサイドレンダリングがあるので追加で待つ
