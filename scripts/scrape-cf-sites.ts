@@ -310,7 +310,9 @@ async function main() {
     console.log(`[Playwright] Fetching ${site.name}: ${site.url}`);
     const page = await context.newPage();
     try {
-      await page.goto(site.url, { waitUntil: "networkidle", timeout: 60000 });
+      await page.goto(site.url, { waitUntil: "domcontentloaded", timeout: 60000 });
+      // Jimdoサイトはクライアントサイドレンダリングがあるので少し待つ
+      await page.waitForTimeout(5000);
       const html = await page.content();
       htmlMap.set(site.id, html);
       console.log(`[Playwright] Got ${html.length} chars from ${site.id}`);
