@@ -195,6 +195,13 @@ function parseDouo(html: string): ScrapedEventRaw[] {
   const events: ScrapedEventRaw[] = [];
   const $ = cheerio.load(html);
 
+  // デバッグ: HTML先頭を出力
+  console.log(`[Douo] HTML snippet (first 500): ${html.slice(0, 500)}`);
+
+  // デバッグ: __WEBSITE_PROPS__ の有無
+  const hasProps = html.includes("__WEBSITE_PROPS__");
+  console.log(`[Douo] Has __WEBSITE_PROPS__: ${hasProps}`);
+
   // デバッグ: テキスト全体から日付パターンを検索
   const bodyText = $("body").text();
   const dateMatches = bodyText.match(/\d{4}年\s*\d{1,2}月\d{1,2}日/g);
