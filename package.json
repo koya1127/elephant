@@ -9,6 +9,10 @@
   },
   "packageManager": "pnpm@10.23.0",
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@vercel/blob": "^2.2.0",
+    "cheerio": "^1.2.0",
+    "playwright": "^1.58.2",
     "turbo": "^2.7.5"
   }
 }
