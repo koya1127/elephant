@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@clerk/localizations": "^3.35.4",
+    "@clerk/nextjs": "^6.37.4",
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.2.0",
     "cheerio": "^1.0.0",
