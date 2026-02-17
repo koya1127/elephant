@@ -50,3 +50,6 @@ check_*.py
 dupes_report.txt
 Usersfab24*
 C?Usersfab24*
+
+# One-off scripts
+scripts/create-stripe-prices.mjs
