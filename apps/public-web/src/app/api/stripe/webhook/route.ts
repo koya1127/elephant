@@ -1,9 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
-import Stripe from "stripe";
+import crypto from "crypto";
 
-// Force Node.js runtime (Stripe SDK requires it)
 export const runtime = "nodejs";
+
+function verifyStripeSignature(
+  payload: string,
+  sigHeader: string,
+  secret: string
+): boolean {
+  const parts = sigHeader.split(",").reduce(
+    (acc, part) => {
+      const [key, value] = part.split("=");
+      if (key === "t") acc.timestamp = value;
+      if (key === "v1") acc.signatures.push(value);
+      return acc;
+    },
+    { timestamp: "", signatures: [] as string[] }
+  );
+
+  if (!parts.timestamp || parts.signatures.length === 0) return false;
+
+  const signedPayload = `${parts.timestamp}.${payload}`;
+  const expectedSig = crypto
+    .createHmac("sha256", secret)
+    .update(signedPayload, "utf8")
+    .digest("hex");
+
+  return parts.signatures.some(
+    (sig) => crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))
+  );
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -16,25 +43,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET is not set");
+    return NextResponse.json(
+      { error: "Webhook secret not configured" },
+      { status: 500 }
     );
-  } catch (err) {
-    console.error("Webhook signature verification failed:", err);
+  }
+
+  if (!verifyStripeSignature(body, sig, webhookSecret)) {
+    console.error("Webhook signature verification failed");
     return NextResponse.json(
       { error: "Invalid signature" },
       { status: 400 }
     );
   }
 
+  const event = JSON.parse(body);
+
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
+    const session = event.data.object;
     const userId = session.metadata?.userId;
     const planId = session.metadata?.planId;
 
@@ -51,13 +80,11 @@ export async function POST(req: NextRequest) {
             stripeSessionId: session.id,
           },
           privateMetadata: {
-            stripeCustomerId: session.customer as string,
+            stripeCustomerId: session.customer,
           },
         });
 
-        console.log(
-          `User ${userId} activated with plan ${planId}`
-        );
+        console.log(`User ${userId} activated with plan ${planId}`);
       } catch (err) {
         console.error("Failed to update user metadata:", err);
         return NextResponse.json(
