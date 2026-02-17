@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { getPlanById } from "@/config/plans";
-import Stripe from "stripe";
 
-// Force Node.js runtime (Stripe SDK requires it)
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
     const stripeKey = process.env.STRIPE_SECRET_KEY;
     if (!stripeKey) {
-      console.error("STRIPE_SECRET_KEY is not set");
       return NextResponse.json(
         { error: "Stripe設定エラー: APIキーが未設定です" },
         { status: 500 }
@@ -70,24 +67,35 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Stripe Checkout Session作成
-    const stripe = new Stripe(stripeKey);
+    // Stripe Checkout Session作成（fetch直接呼び出し）
     const origin = req.nextUrl.origin;
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [
-        {
-          price: plan.stripePriceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${origin}/join/complete?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/join?plan=${plan.id}`,
-      metadata: {
-        userId,
-        planId: plan.id,
+    const params = new URLSearchParams();
+    params.append("mode", "payment");
+    params.append("line_items[0][price]", plan.stripePriceId);
+    params.append("line_items[0][quantity]", "1");
+    params.append("success_url", `${origin}/join/complete?session_id={CHECKOUT_SESSION_ID}`);
+    params.append("cancel_url", `${origin}/join?plan=${plan.id}`);
+    params.append("metadata[userId]", userId);
+    params.append("metadata[planId]", plan.id);
+
+    const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
+      body: params.toString(),
     });
+
+    const session = await stripeRes.json();
+
+    if (!stripeRes.ok) {
+      console.error("Stripe API error:", session);
+      return NextResponse.json(
+        { error: `Stripeエラー: ${session.error?.message || "不明なエラー"}` },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
