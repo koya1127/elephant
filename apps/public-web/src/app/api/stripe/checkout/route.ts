@@ -78,9 +78,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    console.error("Checkout error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Checkout error:", message, err);
     return NextResponse.json(
-      { error: "決済セッションの作成に失敗しました" },
+      { error: `決済セッションの作成に失敗しました: ${message}` },
       { status: 500 }
     );
   }
