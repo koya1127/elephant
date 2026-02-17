@@ -1,36 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
-import crypto from "crypto";
+import Stripe from "stripe";
 
 export const runtime = "nodejs";
-
-function verifyStripeSignature(
-  payload: string,
-  sigHeader: string,
-  secret: string
-): boolean {
-  const parts = sigHeader.split(",").reduce(
-    (acc, part) => {
-      const [key, value] = part.split("=");
-      if (key === "t") acc.timestamp = value;
-      if (key === "v1") acc.signatures.push(value);
-      return acc;
-    },
-    { timestamp: "", signatures: [] as string[] }
-  );
-
-  if (!parts.timestamp || parts.signatures.length === 0) return false;
-
-  const signedPayload = `${parts.timestamp}.${payload}`;
-  const expectedSig = crypto
-    .createHmac("sha256", secret)
-    .update(signedPayload, "utf8")
-    .digest("hex");
-
-  return parts.signatures.some(
-    (sig) => crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))
-  );
-}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -52,18 +24,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!verifyStripeSignature(body, sig, webhookSecret)) {
-    console.error("Webhook signature verification failed");
+  // Use Stripe SDK only for signature verification (local crypto, no network)
+  let event: Stripe.Event;
+  try {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "unused");
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Webhook signature verification failed:", message);
     return NextResponse.json(
-      { error: "Invalid signature" },
+      { error: `Invalid signature: ${message}` },
       { status: 400 }
     );
   }
 
-  const event = JSON.parse(body);
-
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
+    const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.userId;
     const planId = session.metadata?.planId;
 
@@ -80,7 +56,7 @@ export async function POST(req: NextRequest) {
             stripeSessionId: session.id,
           },
           privateMetadata: {
-            stripeCustomerId: session.customer,
+            stripeCustomerId: session.customer as string,
           },
         });
 
