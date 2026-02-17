@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { getStripe } from "@/lib/stripe";
 import { getPlanById } from "@/config/plans";
+import Stripe from "stripe";
+
+// Force Node.js runtime (Stripe SDK requires it)
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      console.error("STRIPE_SECRET_KEY is not set");
+      return NextResponse.json(
+        { error: "Stripe設定エラー: APIキーが未設定です" },
+        { status: 500 }
+      );
+    }
+
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,8 +71,9 @@ export async function POST(req: NextRequest) {
     });
 
     // Stripe Checkout Session作成
+    const stripe = new Stripe(stripeKey);
     const origin = req.nextUrl.origin;
-    const session = await getStripe().checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [
         {

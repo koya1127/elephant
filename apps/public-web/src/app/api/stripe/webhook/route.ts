@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
-import { getStripe } from "@/lib/stripe";
 import Stripe from "stripe";
+
+// Force Node.js runtime (Stripe SDK requires it)
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -14,9 +16,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(
+    event = stripe.webhooks.constructEvent(
       body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!
