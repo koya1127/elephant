@@ -32,3 +32,27 @@
   background: linear-gradient(135deg, #f97316, #fb923c);
   color: #fff;
 }
+
+.join {
+  composes: btn;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff;
+}
+
+.pending {
+  composes: btn;
+  background: linear-gradient(135deg, #eab308, #facc15);
+  color: #422006;
+}
+
+.disabled {
+  composes: btn;
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}

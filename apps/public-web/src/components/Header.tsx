@@ -7,12 +7,28 @@ import {
   SignedOut,
   SignInButton,
   UserButton,
+  useUser,
 } from "@clerk/nextjs";
 
 const navItems = [
   { href: "/", label: "ホーム" },
   { href: "/events", label: "大会一覧" },
 ];
+
+function JoinLink() {
+  const { user, isLoaded } = useUser();
+  if (!isLoaded || !user) return null;
+  const status = (user.publicMetadata as Record<string, unknown>)?.memberStatus;
+  if (status === "active") return null;
+  return (
+    <Link
+      href="/join"
+      className="px-3 py-1.5 text-sm font-bold text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+    >
+      入会する
+    </Link>
+  );
+}
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -45,6 +61,7 @@ export function Header() {
               </SignInButton>
             </SignedOut>
             <SignedIn>
+              <JoinLink />
               <UserButton />
             </SignedIn>
           </nav>
@@ -98,6 +115,11 @@ export function Header() {
                 {item.label}
               </Link>
             ))}
+            <SignedIn>
+              <div onClick={() => setIsMenuOpen(false)}>
+                <JoinLink />
+              </div>
+            </SignedIn>
             <SignedOut>
               <SignInButton mode="modal">
                 <button

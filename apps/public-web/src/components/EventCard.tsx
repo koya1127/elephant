@@ -75,7 +75,7 @@ export function EventCard({
           </div>
 
           <div className={styles.actions}>
-            <EntryButton eventName={event.name} />
+            <EntryButton eventName={event.name} eventId={event.id} />
             {event.detailUrl && (
               <a
                 href={event.detailUrl}

@@ -1,0 +1,230 @@
+.main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #111;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #888;
+  margin-bottom: 32px;
+}
+
+.section {
+  margin-bottom: 32px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f97316;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldFull {
+  composes: field;
+  grid-column: 1 / -1;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.required {
+  color: #ef4444;
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+.input {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.select {
+  composes: input;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+/* Plan selection */
+.planGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.planCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.planCard:hover {
+  border-color: #f97316;
+  background: #fff7ed;
+}
+
+.planCardSelected {
+  composes: planCard;
+  border-color: #f97316;
+  background: #fff7ed;
+}
+
+.planRadio {
+  width: 20px;
+  height: 20px;
+  accent-color: #f97316;
+  flex-shrink: 0;
+}
+
+.planInfo {
+  flex: 1;
+}
+
+.planName {
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+}
+
+.planMeta {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.planPrice {
+  font-size: 18px;
+  font-weight: 800;
+  color: #111;
+  white-space: nowrap;
+}
+
+.planGroupLabel {
+  font-size: 14px;
+  font-weight: 700;
+  color: #555;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.planGroupLabelFirst {
+  composes: planGroupLabel;
+  margin-top: 0;
+}
+
+/* Submit */
+.submitArea {
+  margin-top: 32px;
+  text-align: center;
+}
+
+.submitBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 40px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s;
+}
+
+.submitBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+}
+
+.submitBtn:active {
+  transform: translateY(0);
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.error {
+  color: #ef4444;
+  font-size: 13px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.loginPrompt {
+  text-align: center;
+  padding: 48px 20px;
+}
+
+.loginPromptText {
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 16px;
+}
+
+.loginBtn {
+  display: inline-block;
+  padding: 12px 32px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: #f97316;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
