@@ -2,18 +2,24 @@
 
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import type { Discipline } from "@/lib/types";
+import { EntryModal } from "./EntryModal";
 import styles from "./EntryButton.module.css";
 
 interface EntryButtonProps {
   eventName: string;
   eventId: string;
+  eventDate: string;
+  disciplines: Discipline[];
 }
 
 type MemberStatus = "active" | "pending" | undefined;
 
-export function EntryButton({ eventName, eventId }: EntryButtonProps) {
+export function EntryButton({ eventName, eventId, eventDate, disciplines }: EntryButtonProps) {
   const { user, isSignedIn, isLoaded } = useUser();
   const router = useRouter();
+  const [showModal, setShowModal] = useState(false);
 
   if (!isLoaded) return null;
 
@@ -55,26 +61,50 @@ export function EntryButton({ eventName, eventId }: EntryButtonProps) {
     );
   }
 
-  // 4. エントリー上限到達
+  // 4. エントリー上限到達 → 追加エントリー購入
   if (entriesUsed >= entryLimit) {
+    const handleAdditional = async () => {
+      try {
+        const res = await fetch("/api/stripe/additional-entry", {
+          method: "POST",
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        window.location.href = data.url;
+      } catch (err) {
+        console.error("追加エントリー購入エラー:", err);
+      }
+    };
+
     return (
-      <button className={styles.disabled} disabled>
-        エントリー上限
+      <button className={styles.additional} onClick={handleAdditional}>
+        追加エントリーを購入
       </button>
     );
   }
 
-  // 5. 会員（active）→ エントリーリクエスト可能
-  // TODO: Phase 2でEntryModalに差し替え
+  // 5. 会員（active）→ EntryModal表示
   return (
-    <button
-      className={styles.member}
-      onClick={() => {
-        // Phase 2: EntryModal表示に差し替え予定
-        alert(`「${eventName}」へのエントリー機能は準備中です`);
-      }}
-    >
-      エントリーする
-    </button>
+    <>
+      <button
+        className={styles.member}
+        onClick={() => setShowModal(true)}
+      >
+        エントリーする
+      </button>
+      {showModal && (
+        <EntryModal
+          eventId={eventId}
+          eventName={eventName}
+          eventDate={eventDate}
+          disciplines={disciplines}
+          onClose={() => setShowModal(false)}
+          onSuccess={() => {
+            // Clerk のメタデータはリロードで反映されるが、
+            // ここでは閉じるだけにする
+          }}
+        />
+      )}
+    </>
   );
 }

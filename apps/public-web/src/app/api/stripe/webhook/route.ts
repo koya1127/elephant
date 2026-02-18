@@ -41,9 +41,34 @@ export async function POST(req: NextRequest) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.userId;
-    const planId = session.metadata?.planId;
+    const metaType = session.metadata?.type;
 
-    if (userId && planId) {
+    if (userId && metaType === "additional-entry") {
+      // 追加エントリー購入 → entryLimit を +1
+      try {
+        const clerk = await clerkClient();
+        const user = await clerk.users.getUser(userId);
+        const currentMeta = user.publicMetadata as Record<string, unknown>;
+        const currentLimit = (currentMeta?.entryLimit as number) || 0;
+
+        await clerk.users.updateUserMetadata(userId, {
+          publicMetadata: {
+            ...currentMeta,
+            entryLimit: currentLimit + 1,
+          },
+        });
+
+        console.log(`User ${userId} purchased additional entry. New limit: ${currentLimit + 1}`);
+      } catch (err) {
+        console.error("Failed to update entry limit:", err);
+        return NextResponse.json(
+          { error: "Failed to update entry limit" },
+          { status: 500 }
+        );
+      }
+    } else if (userId) {
+      // 通常の入会決済
+      const planId = session.metadata?.planId;
       try {
         const clerk = await clerkClient();
         const user = await clerk.users.getUser(userId);

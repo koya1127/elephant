@@ -56,3 +56,10 @@
   transform: none;
   box-shadow: none;
 }
+
+.additional {
+  composes: btn;
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  color: #fff;
+  font-size: 12px;
+}

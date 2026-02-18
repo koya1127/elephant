@@ -116,8 +116,14 @@ function JoinForm() {
     }
   };
 
-  const fullPlans = getFullSupportPlans();
-  const entryPlans = getEntryOnlyPlans();
+  // 入門プラン済みユーザーには入門プランを非表示にする
+  const currentPlanId = (user.publicMetadata as Record<string, unknown>)?.planId as string | undefined;
+  const usedIntroPlan = currentPlanId === "full-intro" || currentPlanId === "entry-intro";
+  const filterIntro = (plans: Plan[]) =>
+    usedIntroPlan ? plans.filter((p) => !p.firstYearOnly) : plans;
+
+  const fullPlans = filterIntro(getFullSupportPlans());
+  const entryPlans = filterIntro(getEntryOnlyPlans());
 
   const renderPlanCard = (plan: Plan) => (
     <label

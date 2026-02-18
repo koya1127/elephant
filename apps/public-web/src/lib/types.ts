@@ -45,6 +45,26 @@ export interface Event {
   pdfSize?: number;
 }
 
+/** エントリー情報 */
+export interface Entry {
+  /** 一意なID */
+  id: string;
+  /** Clerk User ID */
+  userId: string;
+  /** Event.id */
+  eventId: string;
+  /** Event.name */
+  eventName: string;
+  /** Event.date */
+  eventDate: string;
+  /** 選択した種目名 */
+  disciplines: string[];
+  /** ステータス */
+  status: "submitted";
+  /** 作成日時（ISO string） */
+  createdAt: string;
+}
+
 /** スクレイピングで取得した大会の生データ（PDFリンク含む） */
 export interface ScrapedEventRaw {
   /** 大会名 */
