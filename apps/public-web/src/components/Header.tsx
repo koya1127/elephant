@@ -15,6 +15,35 @@ const navItems = [
   { href: "/events", label: "大会一覧" },
 ];
 
+function isAdminUser(user: { publicMetadata: Record<string, unknown> }): boolean {
+  return user.publicMetadata?.role === "admin";
+}
+
+function MyPageLink() {
+  return (
+    <Link
+      href="/mypage"
+      className="text-gray-700 hover:text-orange-600 transition-colors font-medium"
+    >
+      マイページ
+    </Link>
+  );
+}
+
+function AdminLink() {
+  const { user, isLoaded } = useUser();
+  if (!isLoaded || !user) return null;
+  if (!isAdminUser(user as { publicMetadata: Record<string, unknown> })) return null;
+  return (
+    <Link
+      href="/admin"
+      className="px-3 py-1.5 text-sm font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+    >
+      管理
+    </Link>
+  );
+}
+
 function JoinLink() {
   const { user, isLoaded } = useUser();
   if (!isLoaded || !user) return null;
@@ -62,6 +91,8 @@ export function Header() {
             </SignedOut>
             <SignedIn>
               <JoinLink />
+              <MyPageLink />
+              <AdminLink />
               <UserButton />
             </SignedIn>
           </nav>
@@ -116,6 +147,16 @@ export function Header() {
               </Link>
             ))}
             <SignedIn>
+              <Link
+                href="/mypage"
+                className="block py-2 text-gray-700 hover:text-orange-600 transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                マイページ
+              </Link>
+              <div onClick={() => setIsMenuOpen(false)}>
+                <AdminLink />
+              </div>
               <div onClick={() => setIsMenuOpen(false)}>
                 <JoinLink />
               </div>

@@ -19,7 +19,7 @@ export async function scrapeEvents(
     : await fetchHtml(config.url, config.encoding);
 
   // 404/空の場合、URLの年を前年に置換して再試行
-  let effectiveConfig = config;
+  let effectiveConfig: SiteConfig = { ...config, effectiveYear: currentYear };
   if (!html || html.trim() === "") {
     const prevUrl = config.url
       .replace(String(currentYear), String(currentYear - 1))
@@ -40,7 +40,11 @@ export async function scrapeEvents(
           baseUrl: config.baseUrl
             .replace(String(currentYear), String(currentYear - 1))
             .replace(`r${reiwa}`, `r${reiwa - 1}`),
+          effectiveYear: currentYear - 1,
         };
+        console.log(
+          `[Fallback] ${config.id}: using year ${currentYear - 1}`
+        );
       }
     }
   }
@@ -123,11 +127,12 @@ async function parseEventsFromHtml(
 
   const $ = cheerio.load(html);
 
+  const year = config.effectiveYear ?? CURRENT_YEAR;
+
   if (config.parser === "sorachi") {
     // 空知: テーブル形式（月と日が別セル、月列はrowspan）
     // td=6: [月, 日, 曜, 大会名, 要項, 申込] ← 月の最初の行
     // td=5: [日, 曜, 大会名, 要項, 申込] ← 同月の続き行
-    const year = CURRENT_YEAR;
     let currentMonth = "";
     $(config.selectors.eventRow).each((_, el) => {
       const tds = $(el).find("td");
@@ -200,7 +205,6 @@ async function parseEventsFromHtml(
         const dateMatch = normalizedDate.match(/(\d+)月(\d+)日/);
 
         if (dateMatch) {
-          const year = CURRENT_YEAR;
           const month = dateMatch[1].padStart(2, "0");
           const day = dateMatch[2].padStart(2, "0");
 
@@ -262,7 +266,6 @@ async function parseEventsFromHtml(
     });
   } else if (config.parser === "tokachi") {
     // 十勝: テーブル形式（日付/大会名/会場/要項PDF等）
-    const year = CURRENT_YEAR;
     $("table tr").each((_, el) => {
       const tds = $(el).find("td");
       if (tds.length < 3) return;
@@ -315,7 +318,6 @@ async function parseEventsFromHtml(
     });
   } else if (config.parser === "chuutairen") {
     // 中体連: テーブル形式（月日/大会名/開催地/要項/申込書/その他）
-    const year = CURRENT_YEAR;
     $("table tr").each((_, el) => {
       const tds = $(el).find("td");
       if (tds.length < 3) return;
@@ -369,7 +371,6 @@ async function parseEventsFromHtml(
     // 学連: Google Sites Classic — テキスト＋リンクから正規表現で抽出
     // ページ全体のテキストから「M/D(曜) 大会名 @会場」パターンを検索
     const text = $.text();
-    const year = CURRENT_YEAR;
     // パターン: "5/3(土) 2025年度北海道学連競技会第1戦 @円山公園陸上競技場"
     const lines = text.split(/\n/);
     for (const line of lines) {
@@ -407,6 +408,7 @@ function parseSapporo(
   guidelineHtml: string,
   config: SiteConfig
 ): ScrapedEventRaw[] {
+  const year = config.effectiveYear ?? CURRENT_YEAR;
   const events: ScrapedEventRaw[] = [];
   const $s = cheerio.load(scheduleHtml);
   const $g = cheerio.load(guidelineHtml);
@@ -439,7 +441,6 @@ function parseSapporo(
     if (month && day && name) {
       const dayClean = day.split("～")[0].split("~")[0].replace(/\D/g, "");
       if (!dayClean) return;
-      const year = CURRENT_YEAR;
       const dateStr = `${year}-${month.padStart(2, "0")}-${dayClean.padStart(2, "0")}`;
       scheduleMap.set(name, { date: dateStr, location });
     }
@@ -496,6 +497,7 @@ async function parseHokkaido(
   html: string,
   config: SiteConfig
 ): Promise<ScrapedEventRaw[]> {
+  const year = config.effectiveYear ?? CURRENT_YEAR;
   const events: ScrapedEventRaw[] = [];
   const $ = cheerio.load(html);
 
@@ -519,7 +521,6 @@ async function parseHokkaido(
     const month = dateMatch[1].padStart(2, "0");
     const day = dateMatch[2].padStart(2, "0");
     const endDay = dateMatch[3] ? dateMatch[3].padStart(2, "0") : null;
-    const year = CURRENT_YEAR;
 
     const dateStr = endDay
       ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
@@ -707,6 +708,7 @@ async function parseMasters(
   scheduleHtml: string,
   config: SiteConfig
 ): Promise<ScrapedEventRaw[]> {
+  const year = config.effectiveYear ?? CURRENT_YEAR;
   const events: ScrapedEventRaw[] = [];
   const $ = cheerio.load(scheduleHtml);
 
@@ -723,7 +725,6 @@ async function parseMasters(
     const dateMatch = dateText.match(/(\d+)月(\d+)日/);
     if (!dateMatch) return;
 
-    const year = CURRENT_YEAR;
     const month = dateMatch[1].padStart(2, "0");
     const day = dateMatch[2].padStart(2, "0");
 
@@ -749,8 +750,6 @@ async function parseMasters(
 
         // 大会名に関連するキーワードがあるかチェック
         if (!text.match(/大会|記録会|選手権|競技会/)) return;
-
-        const year = CURRENT_YEAR;
         const month = dateInTitle[1].padStart(2, "0");
         const day = dateInTitle[2].padStart(2, "0");
 

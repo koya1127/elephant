@@ -11,6 +11,8 @@ interface EventCardProps {
   highlightGrades?: Set<string>;
   /** グレード正規化関数 */
   normalizeGrade?: (raw: string) => string;
+  /** エントリー済みイベントIDセット */
+  enteredEventIds?: Set<string>;
 }
 
 const DOW = ["日", "月", "火", "水", "木", "金", "土"] as const;
@@ -20,10 +22,12 @@ export function EventCard({
   highlightDisciplines,
   highlightGrades,
   normalizeGrade,
+  enteredEventIds,
 }: EventCardProps) {
   const [showAllTags, setShowAllTags] = useState(false);
   const { month, day, dow } = parseDate(event.date);
   const dateRange = event.dateEnd ? `〜${parseDate(event.dateEnd).day}` : "";
+  const isEntered = enteredEventIds?.has(event.id) ?? false;
 
   const isDiscHighlighted = (name: string) =>
     highlightDisciplines && highlightDisciplines.size > 0 && highlightDisciplines.has(name);
@@ -46,7 +50,10 @@ export function EventCard({
         {/* 情報エリア */}
         <div className={styles.info}>
           <div className={styles.infoMain}>
-            <div className={styles.eventName}>{event.name}</div>
+            <div className={styles.eventName}>
+              {event.name}
+              {isEntered && <span className={styles.enteredBadge}>エントリー済み</span>}
+            </div>
             <div className={styles.meta}>
               {event.location && (
                 <a
@@ -75,12 +82,16 @@ export function EventCard({
           </div>
 
           <div className={styles.actions}>
-            <EntryButton
-              eventName={event.name}
-              eventId={event.id}
-              eventDate={event.date}
-              disciplines={event.disciplines}
-            />
+            {isEntered ? (
+              <span className={styles.enteredLabel}>エントリー済み</span>
+            ) : (
+              <EntryButton
+                eventName={event.name}
+                eventId={event.id}
+                eventDate={event.date}
+                disciplines={event.disciplines}
+              />
+            )}
             {event.detailUrl && (
               <a
                 href={event.detailUrl}

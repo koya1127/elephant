@@ -3,6 +3,7 @@ import { scrapeEvents, downloadPdf } from "@/lib/scraper";
 import { parsePdfWithClaude, parseExcelWithClaude } from "@/lib/pdfParser";
 import { siteConfigs } from "@/config/sites";
 import { readEvents, writeEvents } from "@/lib/storage";
+import { checkAdmin } from "@/lib/admin";
 import type { Event, ScrapedEventRaw, ScrapeResult } from "@/lib/types";
 
 // PDF解析は時間がかかるためタイムアウトを延長
@@ -20,13 +21,12 @@ const PDF_CONCURRENCY = 3; // 同時にPDF解析するリクエスト数
  */
 export async function POST(request: Request) {
   try {
-    // 管理者キー認証（POSTはコストがかかるため保護）
+    // 認証: Clerk admin or admin key（外部スクリプト用）
     const adminKey = request.headers.get("x-admin-key");
-    if (!adminKey || adminKey !== process.env.ADMIN_SECRET) {
-      return NextResponse.json(
-        { error: "認証が必要です" },
-        { status: 401 }
-      );
+    const isKeyAuth = adminKey && adminKey === process.env.ADMIN_SECRET;
+    if (!isKeyAuth) {
+      const auth = await checkAdmin();
+      if (!auth.ok) return auth.response;
     }
 
     const { searchParams } = new URL(request.url);

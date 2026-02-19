@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import type { Event, ScrapeResult } from "@/lib/types";
+import { useUser } from "@clerk/nextjs";
+import type { Event, Entry, ScrapeResult } from "@/lib/types";
 import { EventCard } from "./EventCard";
 import styles from "./EventList.module.css";
 
@@ -92,13 +93,11 @@ function disciplineSortKey(name: string): number {
 }
 
 export function EventList() {
+  const { isSignedIn } = useUser();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [scraping, setScraping] = useState(false);
-  const [scrapingSites, setScrapingSites] = useState<Record<string, string>>({}); // siteId → status text
-  const [adminKey, setAdminKey] = useState("");
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [enteredEventIds, setEnteredEventIds] = useState<Set<string>>(new Set());
 
   // Filter state — default open so users see it immediately
   const [filterOpen, setFilterOpen] = useState(false);
@@ -115,77 +114,45 @@ export function EventList() {
   );
   const [showPastEvents, setShowPastEvents] = useState(false);
 
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/scrape");
-      const data: ScrapeResult[] = await res.json();
-      const rawEvents = data.flatMap((r) => r.events).map(sanitizeEvent);
-      // ID重複を排除（先に出現したものを優先）
-      const seen = new Set<string>();
-      const allEvents = rawEvents.filter((e) => {
-        if (seen.has(e.id)) return false;
-        seen.add(e.id);
-        return true;
-      });
-      allEvents.sort((a, b) => a.date.localeCompare(b.date));
-      setEvents(allEvents);
-      setError(null);
-    } catch (err) {
-      setError("データの取得に失敗しました");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /** サイト別スクレイプ */
-  const handleScrapeSite = async (siteId: string, skipPdf: boolean) => {
-    if (!adminKey) {
-      setError("管理者キーを入力してください");
-      return;
-    }
-    const label = skipPdf ? "HTML取得中" : "PDF解析中";
-    setScrapingSites((prev) => ({ ...prev, [siteId]: label }));
-    setError(null);
-    try {
-      const params = new URLSearchParams({ siteId });
-      if (skipPdf) params.set("skipPdf", "true");
-      const res = await fetch(`/api/scrape?${params}`, {
-        method: "POST",
-        headers: { "x-admin-key": adminKey },
-        signal: AbortSignal.timeout(300_000),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "失敗");
-      const count = data.results?.[0]?.events?.length ?? 0;
-      setScrapingSites((prev) => ({ ...prev, [siteId]: `${count}件 OK` }));
-      await fetchEvents();
-    } catch (err) {
-      setScrapingSites((prev) => ({ ...prev, [siteId]: `エラー` }));
-      setError(`${siteId}: ${String(err)}`);
-    }
-  };
-
-  /** 一括実行（順次） */
-  const handleScrapeAll = async (skipPdf: boolean) => {
-    if (!adminKey) {
-      setError("管理者キーを入力してください");
-      return;
-    }
-    setScraping(true);
-    setError(null);
-    const SKIP_SITES = ["douo", "koutairen"];
-    const sites = Object.keys(SOURCE_LABELS).filter((s) => !SKIP_SITES.includes(s));
-    for (const siteId of sites) {
-      await handleScrapeSite(siteId, skipPdf);
-    }
-    setScraping(false);
-  };
-
   useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/scrape");
+        const data: ScrapeResult[] = await res.json();
+        const rawEvents = data.flatMap((r) => r.events).map(sanitizeEvent);
+        const seen = new Set<string>();
+        const allEvents = rawEvents.filter((e) => {
+          if (seen.has(e.id)) return false;
+          seen.add(e.id);
+          return true;
+        });
+        allEvents.sort((a, b) => a.date.localeCompare(b.date));
+        setEvents(allEvents);
+        setError(null);
+      } catch (err) {
+        setError("データの取得に失敗しました");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchEvents();
   }, []);
+
+  // ログインユーザーのエントリー済みイベントID取得
+  useEffect(() => {
+    if (!isSignedIn) return;
+    fetch("/api/entries")
+      .then((r) => r.json())
+      .then((d) => {
+        const ids = new Set<string>(
+          ((d.entries ?? []) as Entry[]).map((e: Entry) => e.eventId)
+        );
+        setEnteredEventIds(ids);
+      })
+      .catch(() => {});
+  }, [isSignedIn]);
 
   // Build normalized filter options
   const filterOptions = useMemo(() => {
@@ -503,99 +470,6 @@ export function EventList() {
 
   return (
     <div className={styles.cardListFade}>
-      {/* 管理者パネル（トグル式） */}
-      <div className={styles.adminToggle}>
-        <button
-          onClick={() => setShowAdmin(!showAdmin)}
-          className={styles.adminToggleBtn}
-        >
-          {showAdmin ? "管理パネルを閉じる" : "管理者"}
-        </button>
-      </div>
-
-      {showAdmin && (
-        <div className={styles.adminPanel}>
-          <input
-            type="password"
-            placeholder="管理者キー"
-            value={adminKey}
-            onChange={(e) => setAdminKey(e.target.value)}
-            className={styles.adminInput}
-          />
-
-          {/* サイト別コントロール */}
-          <div className={styles.siteGrid}>
-            {Object.entries(SOURCE_LABELS).map(([siteId, info]) => {
-              const isExternal = siteId === "douo" || siteId === "koutairen";
-              const status = scrapingSites[siteId];
-              const isBusy = status === "HTML取得中" || status === "PDF解析中";
-              return (
-                <div key={siteId} className={styles.siteRow}>
-                  <div className={styles.siteName}>
-                    <span className={styles.siteShort}>{info.short}</span>
-                    <span className={styles.siteRegion}>{info.region}</span>
-                  </div>
-                  {isExternal ? (
-                    <span className={styles.siteExternal}>専用スクリプト</span>
-                  ) : (
-                    <div className={styles.siteActions}>
-                      <button
-                        onClick={() => handleScrapeSite(siteId, true)}
-                        disabled={isBusy || scraping}
-                        className={styles.btnSmall}
-                      >
-                        {isBusy && status === "HTML取得中" ? <span className={styles.spinner} /> : null}
-                        HTML
-                      </button>
-                      <button
-                        onClick={() => handleScrapeSite(siteId, false)}
-                        disabled={isBusy || scraping}
-                        className={styles.btnSmallPrimary}
-                      >
-                        {isBusy && status === "PDF解析中" ? <span className={styles.spinner} /> : null}
-                        PDF
-                      </button>
-                    </div>
-                  )}
-                  {status && (
-                    <span className={
-                      status.includes("エラー") ? styles.siteStatusError :
-                      status.includes("OK") ? styles.siteStatusOk :
-                      styles.siteStatusBusy
-                    }>{status}</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 一括実行 */}
-          <div className={styles.toolbar}>
-            <button
-              onClick={() => handleScrapeAll(true)}
-              disabled={scraping}
-              className={styles.btnLight}
-            >
-              {scraping && <span className={styles.spinner} />}
-              一括HTML取得
-            </button>
-            <button
-              onClick={() => handleScrapeAll(false)}
-              disabled={scraping}
-              className={styles.btnPrimary}
-            >
-              {scraping && <span className={styles.spinner} />}
-              一括PDF解析
-            </button>
-            {scraping && (
-              <button onClick={() => setScraping(false)} className={styles.btnLight}>
-                中断
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       {error && <div className={styles.error}>{error}</div>}
       {loading && <div className={styles.loading}>読み込み中...</div>}
 
@@ -876,6 +750,7 @@ export function EventList() {
                   highlightDisciplines={selectedDisciplines}
                   highlightGrades={selectedGrades}
                   normalizeGrade={normalizeGradeCategory}
+                  enteredEventIds={enteredEventIds}
                 />
               ))}
             </section>

@@ -101,6 +101,8 @@ export interface SiteConfig {
   guidelineUrl?: string;
   /** Cloudflare保護回避のためcurl経由でHTMLを取得する */
   useCurl?: boolean;
+  /** フォールバック時に設定される実効年（パーサーで使用） */
+  effectiveYear?: number;
   /** HTMLからイベント一覧を抽出するためのセレクタ設定 */
   selectors: {
     /** イベント行のセレクタ */
@@ -112,6 +114,24 @@ export interface SiteConfig {
     /** PDFリンクがあるカラムのインデックス or セレクタ */
     pdfLinkColumn?: number | string;
   };
+}
+
+/** 年別の健康診断データ */
+export interface YearHealth {
+  year: number;
+  eventCount: number;
+  pdfTotal: number;
+  pdfOk: number;
+  pdfErrors: string[];
+}
+
+/** サイト健康診断結果 */
+export interface SiteHealthResult {
+  siteId: string;
+  siteName: string;
+  checkedAt: string;
+  years: YearHealth[];
+  error?: string;
 }
 
 /** スクレイピング結果全体 */
