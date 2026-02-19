@@ -7,9 +7,11 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 /**
  * 指定サイトのHTMLを取得してイベント一覧を抽出する
+ * @param noFallback trueの場合、年フォールバックを無効化（健康診断用）
  */
 export async function scrapeEvents(
-  config: SiteConfig
+  config: SiteConfig,
+  noFallback = false
 ): Promise<ScrapedEventRaw[]> {
   const currentYear = new Date().getFullYear();
   const reiwa = currentYear - 2018;
@@ -19,8 +21,8 @@ export async function scrapeEvents(
     : await fetchHtml(config.url, config.encoding);
 
   // 404/空の場合、URLの年を前年に置換して再試行
-  let effectiveConfig: SiteConfig = { ...config, effectiveYear: currentYear };
-  if (!html || html.trim() === "") {
+  let effectiveConfig: SiteConfig = { ...config, effectiveYear: config.effectiveYear ?? currentYear };
+  if (!noFallback && (!html || html.trim() === "")) {
     const prevUrl = config.url
       .replace(String(currentYear), String(currentYear - 1))
       .replace(`r${reiwa}`, `r${reiwa - 1}`);

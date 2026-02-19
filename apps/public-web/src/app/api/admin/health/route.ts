@@ -127,7 +127,7 @@ async function checkSiteYear(config: SiteConfig, year: number): Promise<YearHeal
   const yh: YearHealth = { year, eventCount: 0, pdfTotal: 0, pdfOk: 0, pdfErrors: [] };
 
   try {
-    const events = await scrapeEvents(config);
+    const events = await scrapeEvents(config, true);
     yh.eventCount = events.length;
 
     const pdfUrls = [...new Set(events.map((e) => e.pdfUrl).filter((u): u is string => !!u))];
