@@ -19,6 +19,11 @@ const SOURCE_LABELS: Record<string, { short: string; region: string }> = {
   masters: { short: "マスターズ", region: "北海道" },
   runnet: { short: "ランネット", region: "ロードレース" },
   tomakomai: { short: "苫小牧", region: "苫小牧市" },
+  dohoku: { short: "道北", region: "旭川・道北" },
+  donan: { short: "道南", region: "函館・道南" },
+  osrk: { short: "小樽後志", region: "小樽・後志" },
+  muroriku: { short: "室蘭", region: "室蘭・西胆振" },
+  ork: { short: "オホーツク", region: "北見・オホーツク" },
 };
 
 type Tab = "entries" | "members" | "scrape";
@@ -331,7 +336,7 @@ function ScrapeTab() {
   const handleScrapeAll = async (skipPdf: boolean) => {
     setScraping(true);
     setError(null);
-    const SKIP_SITES = ["douo", "koutairen"];
+    const SKIP_SITES = ["douo", "koutairen", "tomakomai", "muroriku"];
     const sites = Object.keys(SOURCE_LABELS).filter(
       (s) => !SKIP_SITES.includes(s)
     );
@@ -439,7 +444,7 @@ function ScrapeTab() {
       {/* サイト別スクレイプ */}
       <div className={styles.siteGrid}>
         {Object.entries(SOURCE_LABELS).map(([siteId, info]) => {
-          const isExternal = siteId === "douo" || siteId === "koutairen";
+          const isExternal = siteId === "douo" || siteId === "koutairen" || siteId === "tomakomai" || siteId === "muroriku";
           const status = scrapingSites[siteId];
           const isBusy = status === "HTML取得中" || status === "PDF解析中";
           return (

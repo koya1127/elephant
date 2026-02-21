@@ -223,6 +223,93 @@ export const tomakomaiConfig: SiteConfig = {
   },
 };
 
+/**
+ * 道北陸上競技協会
+ * HTML: Shift_JIS系（CloudFree）、年間スケジュールPDF1本をClaude APIで解析
+ */
+export const dohokuConfig: SiteConfig = {
+  id: "dohoku",
+  name: "道北陸上競技協会",
+  url: "https://cf139878.cloudfree.jp/schedule/schedule.htm",
+  baseUrl: "https://cf139878.cloudfree.jp/schedule/",
+  parser: "dohoku",
+  selectors: {
+    eventRow: "",
+    nameColumn: 0,
+    dateColumn: 0,
+  },
+};
+
+/**
+ * 道南陸上競技協会
+ * HTML: UTF-8, WordPress（ul.athletics_infolist + 個別ページPDF）
+ */
+export const donanConfig: SiteConfig = {
+  id: "donan",
+  name: "道南陸上競技協会",
+  url: "https://donan-rikkyo.jp/athletics/",
+  baseUrl: "https://donan-rikkyo.jp/",
+  parser: "donan",
+  selectors: {
+    eventRow: "",
+    nameColumn: 0,
+    dateColumn: 0,
+  },
+};
+
+/**
+ * 小樽後志陸上競技協会
+ * HTML: UTF-8, WordPress（競技会情報ページ → 個別投稿から日付・PDF取得）
+ */
+export const osrkConfig: SiteConfig = {
+  id: "osrk",
+  name: "小樽後志陸上競技協会",
+  url: "https://osrk.jp/%e7%ab%b6%e6%8a%80%e4%bc%9a%e6%83%85%e5%a0%b1/",
+  baseUrl: "https://osrk.jp/",
+  parser: "osrk",
+  selectors: {
+    eventRow: "",
+    nameColumn: 0,
+    dateColumn: 0,
+  },
+};
+
+/**
+ * 室蘭地方陸上競技協会
+ * HTML: Wixサイト（競技会日程ページ、プレーンテキスト形式）
+ * Wix対策: curl経由
+ */
+export const murorikaConfig: SiteConfig = {
+  id: "muroriku",
+  name: "室蘭地方陸上競技協会",
+  url: "https://muroriku243443.wixsite.com/muroriku/timetable",
+  baseUrl: "https://muroriku243443.wixsite.com/muroriku/",
+  useCurl: true,
+  parser: "muroriku",
+  selectors: {
+    eventRow: "",
+    nameColumn: 0,
+    dateColumn: 0,
+  },
+};
+
+/**
+ * オホーツク陸上競技協会
+ * HTML: UTF-8、大会日程テーブル（月|日|曜|競技会名|開催地|関連ページ）
+ */
+export const orkConfig: SiteConfig = {
+  id: "ork",
+  name: "オホーツク陸上競技協会",
+  url: "https://www.h-ork.jp/tournament_schedule",
+  baseUrl: "https://www.h-ork.jp/",
+  parser: "ork",
+  selectors: {
+    eventRow: "",
+    nameColumn: 0,
+    dateColumn: 0,
+  },
+};
+
 /** 全サイト定義 */
 export const siteConfigs: SiteConfig[] = [
   sorachiConfig,
@@ -237,4 +324,9 @@ export const siteConfigs: SiteConfig[] = [
   mastersConfig,
   runnetConfig,
   tomakomaiConfig,
+  dohokuConfig,
+  donanConfig,
+  osrkConfig,
+  murorikaConfig,
+  orkConfig,
 ];

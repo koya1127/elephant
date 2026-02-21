@@ -20,6 +20,11 @@ const SOURCE_LABELS: Record<string, { short: string; region: string }> = {
   masters: { short: "マスターズ", region: "北海道" },
   runnet: { short: "ランネット", region: "ロードレース" },
   tomakomai: { short: "苫小牧", region: "苫小牧市" },
+  dohoku: { short: "道北", region: "旭川・道北" },
+  donan: { short: "道南", region: "函館・道南" },
+  osrk: { short: "小樽後志", region: "小樽・後志" },
+  muroriku: { short: "室蘭", region: "室蘭・西胆振" },
+  ork: { short: "オホーツク", region: "北見・オホーツク" },
 };
 
 /** 競技場マッピング: event.location / event.name からマッチ */

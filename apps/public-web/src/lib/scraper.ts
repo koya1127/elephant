@@ -64,6 +64,21 @@ export async function scrapeEvents(
     return parseKoutairen(html, effectiveConfig);
   }
 
+  // 道北: スケジュールページからPDFを見つけてClaude APIで解析
+  if (effectiveConfig.parser === "dohoku") {
+    return parseDohoku(html, effectiveConfig);
+  }
+
+  // 道南: 複数ページのリスト + 個別ページのPDFリンク
+  if (effectiveConfig.parser === "donan") {
+    return parseDonan(html, effectiveConfig);
+  }
+
+  // 小樽後志: WordPress投稿一覧 → 個別投稿から日付・PDF取得
+  if (effectiveConfig.parser === "osrk") {
+    return parseOsrk(html, effectiveConfig);
+  }
+
   // マスターズ: schedule.php + news.phpの2段階
   if (effectiveConfig.parser === "masters") {
     return parseMasters(html, effectiveConfig);
@@ -525,6 +540,95 @@ async function parseEventsFromHtml(
         name,
         dateText: dateStr,
         pdfUrl: pdfUrl?.endsWith(".pdf") ? pdfUrl : undefined,
+        detailUrl,
+      });
+    });
+  } else if (config.parser === "muroriku") {
+    // 室蘭: Wixサイト、プレーンテキスト形式
+    // "２０２５年度" ヘッダーから年を取得
+    const rawText = $.text();
+    // 全角数字→半角変換
+    const toHalf = (s: string) =>
+      s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+    const normalizedText = toHalf(rawText);
+
+    // 年度抽出
+    const yearMatch2 = normalizedText.match(/(\d{4})年度/);
+    const scheduleYear = yearMatch2 ? parseInt(yearMatch2[1]) : year;
+
+    // "M月D日（曜）大会名" 行をパース（半角数字）
+    for (const line of normalizedText.split("\n")) {
+      const trimmed = line.trim();
+      // 単日: "M月 D日（曜）大会名"
+      const match = trimmed.match(
+        /(\d{1,2})月\s*(\d{1,2})日[（(][日月火水木金土・祝][）)]\s*(.+)/
+      );
+      if (!match) continue;
+
+      const month = match[1].padStart(2, "0");
+      const day = match[2].padStart(2, "0");
+      let name = match[3]
+        .replace(/【終了】/g, "")
+        .replace(/（終了）/g, "")
+        .replace(/\(終了\)/g, "")
+        .trim();
+      if (!name) continue;
+
+      // 複数日: "～ M2月D2日" or "～ D2日"
+      const endMatch = trimmed.match(/[～~]\s*(?:(\d{1,2})月\s*)?(\d{1,2})日/);
+      let dateStr: string;
+      if (endMatch) {
+        const endMonth = endMatch[1] ? endMatch[1].padStart(2, "0") : month;
+        const endDay = endMatch[2].padStart(2, "0");
+        // 大会名から終了日部分を除去
+        name = name.replace(/[～~].*/, "").trim();
+        dateStr = `${scheduleYear}-${month}-${day}~${scheduleYear}-${endMonth}-${endDay}`;
+      } else {
+        dateStr = `${scheduleYear}-${month}-${day}`;
+      }
+
+      events.push({ name, dateText: dateStr, detailUrl: config.url });
+    }
+  } else if (config.parser === "ork") {
+    // オホーツク: HTMLテーブル（月|日|曜日|競技会名|開催地|関連ページ|結果）
+    // 年度はページヘッダーから取得
+    const pageText = $.text();
+    const yrMatch = pageText.match(/(\d{4})年度/);
+    const scheduleYear = yrMatch ? parseInt(yrMatch[1]) : year;
+
+    $("table").first().find("tbody tr").each((_, el) => {
+      const tds = $(el).find("td");
+      if (tds.length < 4) return;
+
+      const monthStr = $(tds[0]).text().trim();
+      const dayStr = $(tds[1]).text().trim();
+      const name = $(tds[3]).text().trim();
+      const location = tds.length > 4 ? $(tds[4]).text().trim().replace(/[\s　]+/g, "") : "";
+      const linkHref = tds.length > 5 ? $(tds[5]).find("a").attr("href") || "" : "";
+
+      if (!monthStr || !dayStr || !name) return;
+      const month = parseInt(monthStr);
+      const dayMatch2 = dayStr.match(/(\d+)/);
+      if (!month || !dayMatch2) return;
+
+      const monthPad = month.toString().padStart(2, "0");
+      const dayPad = parseInt(dayMatch2[1]).toString().padStart(2, "0");
+
+      // 複数日: "10～11"
+      const dayEndMatch = dayStr.match(/[～~]\s*(\d+)/);
+      const dateStr = dayEndMatch
+        ? `${scheduleYear}-${monthPad}-${dayPad}~${scheduleYear}-${monthPad}-${parseInt(dayEndMatch[1]).toString().padStart(2, "0")}`
+        : `${scheduleYear}-${monthPad}-${dayPad}`;
+
+      const detailUrl = linkHref
+        ? linkHref.startsWith("http")
+          ? linkHref
+          : new URL(linkHref, config.baseUrl).toString()
+        : config.url;
+
+      events.push({
+        name: location ? `${name}　${location}` : name,
+        dateText: dateStr,
         detailUrl,
       });
     });
@@ -1000,4 +1104,213 @@ function parseRunnetPage(
       detailUrl,
     });
   });
+}
+
+/**
+ * 道北: スケジュールページからPDFリンクを見つけてClaude APIで全大会を抽出
+ * cf139878.cloudfree.jp/schedule/schedule.htm → YEAR_schedule.pdf
+ */
+async function parseDohoku(
+  html: string,
+  config: SiteConfig
+): Promise<ScrapedEventRaw[]> {
+  if (!html || html.trim() === "") return [];
+
+  const $ = cheerio.load(html);
+
+  // スケジュールPDFリンクを検索 (例: 2025_schedule.pdf)
+  let pdfUrl: string | undefined;
+  $("a").each((_, el) => {
+    if (pdfUrl) return;
+    const href = $(el).attr("href") || "";
+    if (href.endsWith("_schedule.pdf") || (href.includes("schedule") && href.endsWith(".pdf"))) {
+      pdfUrl = href.startsWith("http")
+        ? href
+        : new URL(href, config.baseUrl).toString();
+    }
+  });
+
+  if (!pdfUrl) {
+    console.warn("[Dohoku] No schedule PDF found on page");
+    return [];
+  }
+
+  console.log(`[Dohoku] Found schedule PDF: ${pdfUrl}`);
+  try {
+    const pdfBuffer = await downloadPdf(pdfUrl);
+    const pdfEvents = await parseSchedulePdfWithClaude(pdfBuffer);
+    console.log(`[Dohoku] Claude extracted ${pdfEvents.length} events`);
+    return pdfEvents.map((pe) => ({
+      name: pe.location ? `${pe.name}　${pe.location}` : pe.name,
+      dateText: pe.dateEnd ? `${pe.date}~${pe.dateEnd}` : pe.date,
+      pdfUrl,
+      detailUrl: pdfUrl!,
+    }));
+  } catch (e) {
+    console.error("[Dohoku] Failed to download/parse PDF:", e);
+    return [];
+  }
+}
+
+/**
+ * 道南: ul.athletics_infolist から複数ページ取得 + 個別ページから要項PDF
+ * donan-rikkyo.jp/athletics/ (ページネーション対応)
+ */
+async function parseDonan(
+  html: string,
+  config: SiteConfig
+): Promise<ScrapedEventRaw[]> {
+  const events: ScrapedEventRaw[] = [];
+
+  const parseListHtml = (pageHtml: string) => {
+    const $p = cheerio.load(pageHtml);
+    $p("ul.athletics_infolist li").each((_, el) => {
+      const a = $p(el).find("a");
+      const detailHref = a.attr("href") || "";
+      const name = $p(el).find(".athletics_infotitle").text().trim();
+      const dateText = $p(el).find("time").text().trim();
+      if (!name || !dateText) return;
+
+      const dateMatch = dateText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+      if (!dateMatch) return;
+
+      const y = dateMatch[1];
+      const m = dateMatch[2].padStart(2, "0");
+      const d = dateMatch[3].padStart(2, "0");
+      const endMatch = dateText.match(/[～~]\s*(?:(\d+)月)?(\d+)日/);
+      const dateStr = endMatch
+        ? `${y}-${m}-${d}~${y}-${(endMatch[1] || dateMatch[2]).padStart(2, "0")}-${endMatch[2].padStart(2, "0")}`
+        : `${y}-${m}-${d}`;
+
+      events.push({
+        name,
+        dateText: dateStr,
+        detailUrl: detailHref || config.url,
+      });
+    });
+  };
+
+  // ページ1
+  parseListHtml(html);
+
+  // 追加ページを取得
+  const $ = cheerio.load(html);
+  const pageUrls = new Set<string>();
+  $("a.page-numbers").each((_, el) => {
+    const href = $(el).attr("href") || "";
+    if (href.includes("/page/")) pageUrls.add(href);
+  });
+  for (const pageUrl of pageUrls) {
+    const pageHtml = await fetchHtml(pageUrl);
+    parseListHtml(pageHtml);
+  }
+
+  // 個別ページから要項PDFリンクを取得（3件並列）
+  const BATCH = 3;
+  for (let i = 0; i < events.length; i += BATCH) {
+    const batch = events.slice(i, i + BATCH);
+    await Promise.all(
+      batch.map(async (ev) => {
+        if (!ev.detailUrl || ev.detailUrl === config.url) return;
+        try {
+          const dHtml = await fetchHtml(ev.detailUrl);
+          const $d = cheerio.load(dHtml);
+          $d("a").each((_, a) => {
+            if (ev.pdfUrl) return;
+            const href = $d(a).attr("href") || "";
+            const text = $d(a).text().trim();
+            if (
+              href.endsWith(".pdf") &&
+              (text.includes("要項") || text.includes("開催要項"))
+            ) {
+              ev.pdfUrl = href.startsWith("http")
+                ? href
+                : new URL(href, config.baseUrl).toString();
+            }
+          });
+        } catch {
+          // 詳細ページ取得失敗は無視
+        }
+      })
+    );
+  }
+
+  return events;
+}
+
+/**
+ * 小樽後志: WordPress投稿一覧から個別投稿を取得し日付・PDFを抽出
+ * osrk.jp/競技会情報/ → 個別投稿（/YYYY/MM/DD/slug/）
+ */
+async function parseOsrk(
+  html: string,
+  config: SiteConfig
+): Promise<ScrapedEventRaw[]> {
+  const events: ScrapedEventRaw[] = [];
+  const $ = cheerio.load(html);
+
+  // 投稿URLを収集 (/YYYY/MM/DD/slug/)
+  const postLinks: string[] = [];
+  $("a").each((_, el) => {
+    const href = $(el).attr("href") || "";
+    if (/osrk\.jp\/\d{4}\/\d{2}\/\d{2}\//.test(href) && !postLinks.includes(href)) {
+      postLinks.push(href);
+    }
+  });
+
+  if (postLinks.length === 0) return [];
+
+  // 各投稿から日付・PDF取得（3件並列）
+  const BATCH = 3;
+  for (let i = 0; i < postLinks.length; i += BATCH) {
+    const batch = postLinks.slice(i, i + BATCH);
+    const results = await Promise.allSettled(
+      batch.map(async (postUrl) => {
+        const postHtml = await fetchHtml(postUrl);
+        const $p = cheerio.load(postHtml);
+
+        const name = $p("h1.entry-title, h1").first().text().trim();
+        if (!name) return null;
+
+        const bodyText = $p(".entry-content, .article-body, main").text();
+
+        // 令和X年（YYYY年）M月D日
+        let dateStr: string | undefined;
+        const rMatch = bodyText.match(
+          /令和\d+年[（(](\d{4})年[）)]\s*(\d{1,2})月\s*(\d{1,2})日/
+        );
+        if (rMatch) {
+          dateStr = `${rMatch[1]}-${rMatch[2].padStart(2, "0")}-${rMatch[3].padStart(2, "0")}`;
+        }
+        if (!dateStr) {
+          const dm = bodyText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+          if (dm) {
+            dateStr = `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}`;
+          }
+        }
+        if (!dateStr) return null;
+
+        // 要項PDFリンク
+        let pdfUrl: string | undefined;
+        $p("a").each((_, a) => {
+          if (pdfUrl) return;
+          const href = $p(a).attr("href") || "";
+          const text = $p(a).text().trim();
+          if (href.endsWith(".pdf") && (text.includes("要項") || text.includes("開催要項"))) {
+            pdfUrl = href.startsWith("http")
+              ? href
+              : new URL(href, config.baseUrl).toString();
+          }
+        });
+
+        return { name, dateText: dateStr, detailUrl: postUrl, pdfUrl } as ScrapedEventRaw;
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value) events.push(r.value);
+    }
+  }
+
+  return events;
 }
