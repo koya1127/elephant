@@ -57,13 +57,13 @@ export async function POST(request: Request) {
               const prevReiwa = prevYear - 2018;
               const curReiwa = currentYear - 2018;
               const url = config.url
-                .replace(String(currentYear), String(yr))
-                .replace(String(prevYear), String(yr))
+                .replaceAll(String(currentYear), String(yr))
+                .replaceAll(String(prevYear), String(yr))
                 .replace(`r${curReiwa}`, `r${reiwa}`)
                 .replace(`r${prevReiwa}`, `r${reiwa}`);
               const baseUrl = config.baseUrl
-                .replace(String(currentYear), String(yr))
-                .replace(String(prevYear), String(yr));
+                .replaceAll(String(currentYear), String(yr))
+                .replaceAll(String(prevYear), String(yr));
               const yearConfig: SiteConfig = { ...config, url, baseUrl, effectiveYear: yr };
               return { yr, health: await checkSiteYear(yearConfig, yr) };
             })
