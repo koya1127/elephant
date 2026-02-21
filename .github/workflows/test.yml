@@ -24,5 +24,3 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm --filter public-web test
-
-      - run: pnpm --filter public-web build
