@@ -111,9 +111,14 @@ function fetchHtmlWithCurl(url: string): string {
 
 export async function downloadPdf(url: string): Promise<Buffer> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to download PDF: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Failed to download PDF: ${res.status} ${res.statusText}`);
   const arrayBuffer = await res.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  const buffer = Buffer.from(arrayBuffer);
+  // PDFマジックバイト検証: HTMLエラーページ(200 OK)を誤検知しないようにする
+  if (buffer.length < 4 || buffer.slice(0, 4).toString("ascii") !== "%PDF") {
+    throw new Error(`Not a valid PDF (got HTML or other content): ${url}`);
+  }
+  return buffer;
 }
 
 async function parseEventsFromHtml(

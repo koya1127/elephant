@@ -96,9 +96,10 @@ export async function POST(request: Request) {
               if (
                 prev &&
                 prev.pdfSize != null &&
-                prev.pdfSize === currentSize
+                prev.pdfSize === currentSize &&
+                prev.disciplines.length > 0  // disciplines空なら再解析
               ) {
-                // サイズ同じ → 前回の解析結果を再利用
+                // サイズ同じ & disciplines済み → 前回の解析結果を再利用
                 console.log(
                   `[Doc] Skipped (unchanged): ${raw.name}`
                 );
