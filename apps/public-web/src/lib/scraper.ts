@@ -20,35 +20,37 @@ export async function scrapeEvents(
     ? fetchHtmlWithCurl(config.url)
     : await fetchHtml(config.url, config.encoding);
 
-  // 404/空の場合、URLの年を前年に置換して再試行
   let effectiveConfig: SiteConfig = { ...config, effectiveYear: config.effectiveYear ?? currentYear };
-  if (!noFallback && (!html || html.trim() === "")) {
-    const prevUrl = config.url
-      .replace(String(currentYear), String(currentYear - 1))
-      .replace(`r${reiwa}`, `r${reiwa - 1}`);
 
-    if (prevUrl !== config.url) {
-      console.log(
-        `[Fallback] ${config.id}: trying previous year URL: ${prevUrl}`
-      );
-      html = config.useCurl
-        ? fetchHtmlWithCurl(prevUrl)
-        : await fetchHtml(prevUrl, config.encoding);
+  // 前年URLを計算（年依存URLかどうか判定）
+  const prevUrl = config.url
+    .replace(String(currentYear), String(currentYear - 1))
+    .replace(`r${reiwa}`, `r${reiwa - 1}`);
+  const isYearDependent = !noFallback && prevUrl !== config.url;
 
-      if (html && html.trim() !== "") {
-        effectiveConfig = {
-          ...config,
-          url: prevUrl,
-          baseUrl: config.baseUrl
-            .replace(String(currentYear), String(currentYear - 1))
-            .replace(`r${reiwa}`, `r${reiwa - 1}`),
-          effectiveYear: currentYear - 1,
-        };
-        console.log(
-          `[Fallback] ${config.id}: using year ${currentYear - 1}`
-        );
-      }
-    }
+  // 前年URLに切り替えるヘルパー
+  const applyPrevYear = async (): Promise<boolean> => {
+    console.log(`[Fallback] ${config.id}: trying previous year URL: ${prevUrl}`);
+    const prevHtml = config.useCurl
+      ? fetchHtmlWithCurl(prevUrl)
+      : await fetchHtml(prevUrl, config.encoding);
+    if (!prevHtml || prevHtml.trim() === "") return false;
+    html = prevHtml;
+    effectiveConfig = {
+      ...config,
+      url: prevUrl,
+      baseUrl: config.baseUrl
+        .replace(String(currentYear), String(currentYear - 1))
+        .replace(`r${reiwa}`, `r${reiwa - 1}`),
+      effectiveYear: currentYear - 1,
+    };
+    console.log(`[Fallback] ${config.id}: using year ${currentYear - 1}`);
+    return true;
+  };
+
+  // HTML空の場合は即フォールバック
+  if (isYearDependent && (!html || html.trim() === "")) {
+    await applyPrevYear();
   }
 
   // 札幌は要項ページも取得して2段階でパース
@@ -72,7 +74,16 @@ export async function scrapeEvents(
     return parseRunnet(html, effectiveConfig);
   }
 
-  return await parseEventsFromHtml(html, effectiveConfig);
+  // 一般パーサー: パース後も0件なら前年にフォールバック
+  // （年が変わったが新年ページが未更新でHTML自体は存在するケース）
+  const events = await parseEventsFromHtml(html, effectiveConfig);
+  if (isYearDependent && events.length === 0) {
+    const didFallback = await applyPrevYear();
+    if (didFallback) {
+      return await parseEventsFromHtml(html, effectiveConfig);
+    }
+  }
+  return events;
 }
 
 const UA =
