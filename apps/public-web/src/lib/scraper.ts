@@ -307,9 +307,9 @@ export async function parseEventsFromHtml(
       const tds = $(el).find("td");
       if (tds.length < 3) return;
 
-      const dateText = $(tds[0]).text().trim();
+      const dateText = $(tds[0]).text().replace(/\s+/g, " ").trim();
       // colspanがある場合があるため、大会名は2番目のtd（colspan=2の可能性あり）
-      const name = $(tds[1]).text().trim();
+      const name = $(tds[1]).text().replace(/\s+/g, " ").trim();
 
       if (!dateText || !name) return;
 
@@ -344,7 +344,7 @@ export async function parseEventsFromHtml(
         : config.url;
 
       // 会場（3番目のtd、存在すれば）
-      const location = tds.length >= 3 ? $(tds[2]).text().trim() : "";
+      const location = tds.length >= 3 ? $(tds[2]).text().replace(/\s+/g, " ").trim() : "";
 
       events.push({
         name: location ? `${name}　${location}` : name,
