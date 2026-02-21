@@ -519,12 +519,20 @@ export async function parseEventsFromHtml(
         ? `${westernYear}-${month}-${day}~${endDateStr}`
         : `${westernYear}-${month}-${day}`;
 
-      // PDFリンク: hgridの後続兄弟から .j-imageSubtitle を探す
+      // PDFリンク: hgridの後続兄弟（j-hgrid含む）から .j-imageSubtitle を探す
+      // 注: Jimdo Creatorでは「イベント行j-hgrid」と「PDF行j-hgrid」が別要素になる場合がある
       let pdfUrl: string | undefined;
       let sibling = block.next();
-      // 次の .j-hgrid に到達するまで探す（最大5要素）
-      for (let i = 0; i < 5 && sibling.length; i++) {
-        if (sibling.hasClass("j-hgrid")) break;
+      // 最大8要素先まで探す（j-hgridでも次のイベントでなければ通過）
+      for (let i = 0; i < 8 && sibling.length; i++) {
+        // j-hgridがイベント名（font-size:22）を持つなら次のイベント → 終了
+        if (sibling.hasClass("j-hgrid")) {
+          const hasEventName = sibling.find("b, span, strong").toArray().some((tag) => {
+            const s = $(tag).attr("style") || "";
+            return s.includes("font-size") && s.includes("22");
+          });
+          if (hasEventName) break;
+        }
         sibling.find(".j-imageSubtitle figure a, .j-imageSubtitle a, a").each((_, a) => {
           if (pdfUrl) return;
           const href = $(a).attr("href") || "";
@@ -538,12 +546,22 @@ export async function parseEventsFromHtml(
         sibling = sibling.next();
       }
 
+      // Google Drive /view URL → 直接DL URLに変換
+      if (pdfUrl) {
+        const gdMatch = pdfUrl.match(/drive\.google\.com\/file\/d\/([^/]+)\//);
+        if (gdMatch) {
+          pdfUrl = `https://drive.google.com/uc?export=download&id=${gdMatch[1]}`;
+        }
+      }
+
       const detailUrl = pdfUrl || config.url;
 
       events.push({
         name,
         dateText: dateStr,
-        pdfUrl: pdfUrl?.endsWith(".pdf") ? pdfUrl : undefined,
+        pdfUrl: pdfUrl?.endsWith(".pdf") || pdfUrl?.includes("export=download")
+          ? pdfUrl
+          : undefined,
         detailUrl,
       });
     });
