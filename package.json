@@ -6,7 +6,8 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "scrape:douo": "npx tsx scripts/scrape-douo.ts"
+    "scrape:douo": "npx tsx scripts/scrape-douo.ts",
+    "scrape:tomakomai": "npx tsx scripts/scrape-tomakomai.ts"
   },
   "packageManager": "pnpm@10.23.0",
   "devDependencies": {
