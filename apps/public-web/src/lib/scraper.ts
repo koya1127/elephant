@@ -149,7 +149,7 @@ export async function downloadPdf(url: string): Promise<Buffer> {
   return buffer;
 }
 
-async function parseEventsFromHtml(
+export async function parseEventsFromHtml(
   html: string,
   config: SiteConfig,
   noLlm = false
