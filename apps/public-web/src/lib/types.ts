@@ -79,7 +79,7 @@ export interface ScrapedEventRaw {
 
 /** サイトのHTMLパーサータイプ */
 export type SiteParserType = "sorachi" | "kushiro" | "douo" | "sapporo" | "hokkaido"
-  | "tokachi" | "chuutairen" | "koutairen" | "gakuren" | "masters" | "runnet";
+  | "tokachi" | "chuutairen" | "koutairen" | "gakuren" | "masters" | "runnet" | "tomakomai";
 
 /** サイト定義 */
 export interface SiteConfig {

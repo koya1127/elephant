@@ -204,6 +204,25 @@ export const runnetConfig: SiteConfig = {
   },
 };
 
+/**
+ * 苫小牧陸上競技協会
+ * HTML: UTF-8, Jimdo Creatorサイト（.j-hgrid構造で大会情報を掲載）
+ * 403対策: curl経由
+ */
+export const tomakomaiConfig: SiteConfig = {
+  id: "tomakomai",
+  name: "苫小牧陸上競技協会",
+  url: "https://tomakomairikkyo.jimdofree.com/%E7%AB%B6%E6%8A%80%E4%BC%9A%E7%AD%89%E6%83%85%E5%A0%B1/",
+  baseUrl: "https://tomakomairikkyo.jimdofree.com/",
+  useCurl: true,
+  parser: "tomakomai",
+  selectors: {
+    eventRow: "",
+    nameColumn: 0,
+    dateColumn: 0,
+  },
+};
+
 /** 全サイト定義 */
 export const siteConfigs: SiteConfig[] = [
   sorachiConfig,
@@ -217,4 +236,5 @@ export const siteConfigs: SiteConfig[] = [
   gakurenConfig,
   mastersConfig,
   runnetConfig,
+  tomakomaiConfig,
 ];

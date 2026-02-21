@@ -400,6 +400,118 @@ async function parseEventsFromHtml(
         });
       }
     }
+  } else if (config.parser === "tomakomai") {
+    // 苫小牧: Jimdo Creator — .j-hgrid ブロックごとに大会情報を抽出
+    // 左カラム: 大会名（font-size:22px）+ 開催日（赤文字、令和表記）
+    // 後続の .j-imageSubtitle: 要項PDFリンク
+
+    // 全角数字→半角変換ヘルパー
+    const toHalf = (s: string) =>
+      s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+
+    // 令和→西暦変換ヘルパー
+    const reiwToYear = (r: number) => 2018 + r;
+
+    $(".j-hgrid").each((_, el) => {
+      const block = $(el);
+
+      // 大会名: 左カラム内の font-size:22px テキストを全て結合
+      const nameParts: string[] = [];
+      block.find("b, span, strong").each((_, tag) => {
+        const style = $(tag).attr("style") || "";
+        if (style.includes("font-size") && style.includes("22")) {
+          const t = $(tag).text().trim();
+          if (t) nameParts.push(t);
+        }
+      });
+      // フォールバック: 色付き大きめテキスト
+      if (nameParts.length === 0) {
+        block.find("span, b, strong").each((_, tag) => {
+          const style = $(tag).attr("style") || "";
+          if (style.includes("color") && style.includes("#254e0e")) {
+            const t = $(tag).text().trim();
+            if (t && t.length > 3) nameParts.push(t);
+          }
+        });
+      }
+      if (nameParts.length === 0) return;
+      // 分割された名前を結合（「第１」+「戦」→「第１戦」）
+      const name = nameParts.join("")
+        .replace(/\s*E-mail:.*$/i, "")   // フッターのメール情報除去
+        .replace(/\s*※.*$/, "")           // 注釈除去
+        .trim();
+      if (!name || name.includes("@")) return; // メールアドレスを含むゴミブロック除外
+
+      // 開催日: 赤文字テキストから「開催日」行を探す
+      let dateText = "";
+      block.find("span, b, strong, font").each((_, tag) => {
+        const style = $(tag).attr("style") || "";
+        const color = $(tag).attr("color") || "";
+        const text = $(tag).text().trim();
+        if ((style.includes("#ff0000") || style.includes("red") || color.includes("#ff0000") || color.includes("red"))
+            && text.includes("開催日")) {
+          dateText = text;
+        }
+      });
+      // フォールバック: ブロック全体のテキストから開催日を探す
+      if (!dateText) {
+        const allText = block.text();
+        const match = allText.match(/開催日[：:].*/);
+        if (match) dateText = match[0];
+      }
+      if (!dateText) return;
+
+      // 令和日付をパース
+      const normalized = toHalf(dateText);
+      const reiwaMatch = normalized.match(/令和(\d+)年(\d+)月(\d+)日/);
+      if (!reiwaMatch) return;
+
+      const reiwaNum = parseInt(reiwaMatch[1], 10);
+      const westernYear = reiwToYear(reiwaNum);
+      const month = reiwaMatch[2].padStart(2, "0");
+      const day = reiwaMatch[3].padStart(2, "0");
+
+      // 終了日（〜 で2日以上の場合）
+      let endDateStr: string | null = null;
+      const endMatch = normalized.match(/[～〜~]\s*(?:(\d+)月)?(\d+)日/);
+      if (endMatch) {
+        const endMonth = endMatch[1] ? endMatch[1].padStart(2, "0") : month;
+        const endDay = endMatch[2].padStart(2, "0");
+        endDateStr = `${westernYear}-${endMonth}-${endDay}`;
+      }
+
+      const dateStr = endDateStr
+        ? `${westernYear}-${month}-${day}~${endDateStr}`
+        : `${westernYear}-${month}-${day}`;
+
+      // PDFリンク: hgridの後続兄弟から .j-imageSubtitle を探す
+      let pdfUrl: string | undefined;
+      let sibling = block.next();
+      // 次の .j-hgrid に到達するまで探す（最大5要素）
+      for (let i = 0; i < 5 && sibling.length; i++) {
+        if (sibling.hasClass("j-hgrid")) break;
+        sibling.find(".j-imageSubtitle figure a, .j-imageSubtitle a, a").each((_, a) => {
+          if (pdfUrl) return;
+          const href = $(a).attr("href") || "";
+          const caption = $(a).closest("figure").find("figcaption").text()
+            || $(a).text();
+          if (href && (caption.includes("要項") || caption.includes("大会要項"))) {
+            pdfUrl = href.startsWith("http") ? href : new URL(href, config.baseUrl).toString();
+          }
+        });
+        if (pdfUrl) break;
+        sibling = sibling.next();
+      }
+
+      const detailUrl = pdfUrl || config.url;
+
+      events.push({
+        name,
+        dateText: dateStr,
+        pdfUrl: pdfUrl?.endsWith(".pdf") ? pdfUrl : undefined,
+        detailUrl,
+      });
+    });
   }
 
   return events;
