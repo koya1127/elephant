@@ -19,6 +19,7 @@ const SOURCE_LABELS: Record<string, { short: string; region: string }> = {
   gakuren: { short: "学連", region: "北海道大学" },
   masters: { short: "マスターズ", region: "北海道" },
   runnet: { short: "ランネット", region: "ロードレース" },
+  tomakomai: { short: "苫小牧", region: "苫小牧市" },
 };
 
 /** 競技場マッピング: event.location / event.name からマッチ */
