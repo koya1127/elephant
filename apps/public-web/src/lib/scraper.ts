@@ -1260,11 +1260,14 @@ async function parseOsrk(
 
   try {
     const res = await fetch(apiUrl, { headers: { "User-Agent": UA } });
+    console.log(`[Osrk] WP API status: ${res.status}, ok: ${res.ok}`);
     if (!res.ok) {
-      console.error(`[Osrk] WP API returned ${res.status}`);
+      const body = await res.text();
+      console.error(`[Osrk] WP API error body: ${body.substring(0, 200)}`);
       return [];
     }
     posts = await res.json();
+    console.log(`[Osrk] WP API returned ${posts.length} posts`);
   } catch (e) {
     console.error("[Osrk] Failed to fetch WP API:", e);
     return [];
