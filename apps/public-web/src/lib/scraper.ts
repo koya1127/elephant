@@ -8,10 +8,12 @@ const CURRENT_YEAR = new Date().getFullYear();
 /**
  * 指定サイトのHTMLを取得してイベント一覧を抽出する
  * @param noFallback trueの場合、年フォールバックを無効化（健康診断用）
+ * @param noLlm trueの場合、Claude API呼び出しをスキップ（健康診断用）
  */
 export async function scrapeEvents(
   config: SiteConfig,
-  noFallback = false
+  noFallback = false,
+  noLlm = false
 ): Promise<ScrapedEventRaw[]> {
   const currentYear = new Date().getFullYear();
   const reiwa = currentYear - 2018;
@@ -91,11 +93,11 @@ export async function scrapeEvents(
 
   // 一般パーサー: パース後も0件なら前年にフォールバック
   // （年が変わったが新年ページが未更新でHTML自体は存在するケース）
-  const events = await parseEventsFromHtml(html, effectiveConfig);
+  const events = await parseEventsFromHtml(html, effectiveConfig, noLlm);
   if (isYearDependent && events.length === 0) {
     const didFallback = await applyPrevYear();
     if (didFallback) {
-      return await parseEventsFromHtml(html, effectiveConfig);
+      return await parseEventsFromHtml(html, effectiveConfig, noLlm);
     }
   }
   return events;
@@ -149,13 +151,14 @@ export async function downloadPdf(url: string): Promise<Buffer> {
 
 async function parseEventsFromHtml(
   html: string,
-  config: SiteConfig
+  config: SiteConfig,
+  noLlm = false
 ): Promise<ScrapedEventRaw[]> {
   const events: ScrapedEventRaw[] = [];
 
   // 北海道陸協はPDFパースロジックを含むため特別扱い
   if (config.parser === "hokkaido") {
-    return parseHokkaido(html, config);
+    return parseHokkaido(html, config, noLlm);
   }
 
   const $ = cheerio.load(html);
@@ -739,7 +742,8 @@ function parseSapporo(
 
 async function parseHokkaido(
   html: string,
-  config: SiteConfig
+  config: SiteConfig,
+  noLlm = false
 ): Promise<ScrapedEventRaw[]> {
   const year = config.effectiveYear ?? CURRENT_YEAR;
   const events: ScrapedEventRaw[] = [];
@@ -785,8 +789,8 @@ async function parseHokkaido(
     });
   });
 
-  // 2. スケジュールPDFをClaude APIで解析してマージ
-  if (config.scheduleUrl) {
+  // 2. スケジュールPDFをClaude APIで解析してマージ（健康診断時はスキップ）
+  if (config.scheduleUrl && !noLlm) {
     try {
       console.log(`[Hokkaido] Fetching schedule page: ${config.scheduleUrl}`);
       const scheduleHtml = await fetchHtml(config.scheduleUrl);

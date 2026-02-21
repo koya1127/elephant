@@ -65,15 +65,15 @@ export async function POST(request: Request) {
                 .replaceAll(String(currentYear), String(yr))
                 .replaceAll(String(prevYear), String(yr));
               const yearConfig: SiteConfig = { ...config, url, baseUrl, effectiveYear: yr };
-              return { yr, health: await checkSiteYear(yearConfig, yr) };
+              return { yr, health: await checkSiteYear(yearConfig, yr, true) };
             })
           );
           for (const r of yearResults) {
             if (r.status === "fulfilled") result.years.push(r.value.health);
           }
         } else {
-          // 固定URL: 一括取得してイベント日付から年を振り分け
-          const events = await scrapeEvents({ ...config, effectiveYear: currentYear });
+          // 固定URL: 一括取得してイベント日付から年を振り分け（LLM不使用）
+          const events = await scrapeEvents({ ...config, effectiveYear: currentYear }, false, true);
           const byYear = new Map<number, ScrapedEventRaw[]>();
           for (const e of events) {
             const dateYear = parseInt(e.dateText.substring(0, 4), 10);
@@ -127,11 +127,11 @@ export async function POST(request: Request) {
 }
 
 /** 特定年のサイトをチェック */
-async function checkSiteYear(config: SiteConfig, year: number): Promise<YearHealth> {
+async function checkSiteYear(config: SiteConfig, year: number, noLlm = false): Promise<YearHealth> {
   const yh: YearHealth = { year, eventCount: 0, pdfTotal: 0, pdfOk: 0, pdfErrors: [] };
 
   try {
-    const events = await scrapeEvents(config, true);
+    const events = await scrapeEvents(config, true, noLlm);
     yh.eventCount = events.length;
 
     const pdfUrls = [...new Set(events.map((e) => e.pdfUrl).filter((u): u is string => !!u))];
