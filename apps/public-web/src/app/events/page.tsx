@@ -6,9 +6,6 @@ export default function EventsPage() {
     <main className={styles.main}>
       <header className={styles.header}>
         <h1 className={styles.title}>大会スケジュール</h1>
-        <p className={styles.subtitle}>
-          空知地区の陸上競技大会一覧
-        </p>
       </header>
       <EventList />
     </main>
