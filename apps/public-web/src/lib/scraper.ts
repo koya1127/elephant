@@ -545,19 +545,23 @@ async function parseEventsFromHtml(
     });
   } else if (config.parser === "muroriku") {
     // 室蘭: Wixサイト、プレーンテキスト形式
-    // "２０２５年度" ヘッダーから年を取得
-    const rawText = $.text();
-    // 全角数字→半角変換
+    // Wix SPAはcheerio $.text()で改行が入らないため、<p>要素ごとに処理
     const toHalf = (s: string) =>
       s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
-    const normalizedText = toHalf(rawText);
 
-    // 年度抽出
-    const yearMatch2 = normalizedText.match(/(\d{4})年度/);
+    // 年度抽出（全体テキストから）
+    const fullText = toHalf($.text());
+    const yearMatch2 = fullText.match(/(\d{4})年度/);
     const scheduleYear = yearMatch2 ? parseInt(yearMatch2[1]) : year;
 
-    // "M月D日（曜）大会名" 行をパース（半角数字）
-    for (const line of normalizedText.split("\n")) {
+    // <p>要素ごとにテキストを取り出してパース（&nbsp; → space変換含む）
+    const lines: string[] = [];
+    $("p").each((_, el) => {
+      const t = toHalf($(el).text().replace(/\u00a0/g, " ").trim());
+      if (t) lines.push(t);
+    });
+
+    for (const line of lines) {
       const trimmed = line.trim();
       // 単日: "M月 D日（曜）大会名"
       const match = trimmed.match(
