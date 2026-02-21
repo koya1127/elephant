@@ -214,11 +214,19 @@ function parseTomakomai(html: string): ScrapedEventRaw[] {
       ? `${westernYear}-${month}-${day}~${endDateStr}`
       : `${westernYear}-${month}-${day}`;
 
-    // PDFリンク: 後続兄弟の .j-imageSubtitle から要項PDFを探す
+    // PDFリンク: 後続兄弟（j-hgrid含む）から .j-imageSubtitle を探す
+    // Jimdo CreatorではPDF列が別のj-hgridになるため、j-hgridで即breakしない
     let pdfUrl: string | undefined;
     let sibling = block.next();
-    for (let i = 0; i < 5 && sibling.length; i++) {
-      if (sibling.hasClass("j-hgrid")) break;
+    for (let i = 0; i < 8 && sibling.length; i++) {
+      // 次のイベントのj-hgrid（font-size:22の大会名あり）なら終了
+      if (sibling.hasClass("j-hgrid")) {
+        const hasEventName = sibling.find("b, span, strong").toArray().some((tag) => {
+          const s = $(tag).attr("style") || "";
+          return s.includes("font-size") && s.includes("22");
+        });
+        if (hasEventName) break;
+      }
       sibling.find(".j-imageSubtitle figure a, .j-imageSubtitle a, a").each((_, a) => {
         if (pdfUrl) return;
         const href = $(a).attr("href") || "";
@@ -234,10 +242,19 @@ function parseTomakomai(html: string): ScrapedEventRaw[] {
       sibling = sibling.next();
     }
 
+    // Google Drive /view URL → 直接DL URLに変換
+    if (pdfUrl) {
+      const gdMatch = pdfUrl.match(/drive\.google\.com\/file\/d\/([^/]+)\//);
+      if (gdMatch) {
+        pdfUrl = `https://drive.google.com/uc?export=download&id=${gdMatch[1]}`;
+      }
+    }
+
+    const isPdfUrl = pdfUrl?.endsWith(".pdf") || pdfUrl?.includes("export=download");
     events.push({
       name,
       dateText: dateStr,
-      pdfUrl: pdfUrl?.endsWith(".pdf") ? pdfUrl : undefined,
+      pdfUrl: isPdfUrl ? pdfUrl : undefined,
       detailUrl: pdfUrl || TOMAKOMAI_URL,
     });
   });
