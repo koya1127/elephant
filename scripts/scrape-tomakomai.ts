@@ -15,11 +15,13 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import * as cheerio from "cheerio";
 import { list, put } from "@vercel/blob";
+import { parsePdfWithClaude } from "../apps/public-web/src/lib/pdfParser";
+import { downloadPdf } from "../apps/public-web/src/lib/scraper";
 
-// .env.blob を読み込み
-function loadEnv() {
+// .env ファイルを読み込む共通関数
+function loadEnvFile(filename: string) {
   try {
-    const envPath = resolve(process.cwd(), ".env.blob");
+    const envPath = resolve(process.cwd(), filename);
     const content = readFileSync(envPath, "utf-8");
     for (const line of content.split("\n")) {
       const trimmed = line.trim();
@@ -36,10 +38,11 @@ function loadEnv() {
       }
     }
   } catch {
-    // .env.blob がなければスキップ
+    // ファイルがなければスキップ
   }
 }
-loadEnv();
+loadEnvFile(".env.blob");
+loadEnvFile(".env.local");
 
 // ---------------------------------------------------------------------------
 // Types
@@ -308,7 +311,39 @@ async function main() {
     };
   });
 
-  // 3. Vercel Blob マージ
+  // 3. PDF解析（pdfUrlがあれば Claude API で種目抽出）
+  if (process.env.ANTHROPIC_API_KEY) {
+    console.log("\n[PDF] Parsing disciplines from PDFs...");
+    const pdfEvents = events.filter((e) => e.pdfUrl);
+    console.log(`[PDF] ${pdfEvents.length} events have PDF URLs`);
+
+    // 3件並列で処理
+    const chunkSize = 3;
+    for (let i = 0; i < pdfEvents.length; i += chunkSize) {
+      const chunk = pdfEvents.slice(i, i + chunkSize);
+      await Promise.all(
+        chunk.map(async (event) => {
+          try {
+            console.log(`[PDF] Parsing: ${event.name}`);
+            const buf = await downloadPdf(event.pdfUrl!);
+            const result = await parsePdfWithClaude(buf);
+            event.disciplines = result.disciplines;
+            if (result.disciplines.length > 0) {
+              console.log(`  → ${result.disciplines.map((d) => d.name).join(", ")}`);
+            } else {
+              console.log(`  → 種目なし`);
+            }
+          } catch (err) {
+            console.warn(`  → 解析失敗: ${event.name}`, err);
+          }
+        })
+      );
+    }
+  } else {
+    console.warn("[PDF] ANTHROPIC_API_KEY 未設定。種目解析をスキップ。");
+  }
+
+  // 4. Vercel Blob マージ
   console.log("\n[Blob] Reading existing data...");
   const existing = await readFromBlob();
   const idx = existing.findIndex((e) => e.sourceId === "tomakomai");
