@@ -585,7 +585,13 @@ async function parseEventsFromHtml(
         const endMonth = endMatch[1] ? endMatch[1].padStart(2, "0") : month;
         const endDay = endMatch[2].padStart(2, "0");
         // 大会名から終了日部分を除去
-        name = name.replace(/[～~].*/, "").trim();
+        // パターンA: "大会名～終了日" → ～以降を削除
+        // パターンB: "～終了日（曜）大会名" → nameが～始まりの場合、終了日の後の大会名を取得
+        if (/^[～~]/.test(name)) {
+          name = name.replace(/^[～~]\s*(?:\d{1,2}月\s*)?\d{1,2}日[（(][^）)]*[）)]\s*/, "").trim();
+        } else {
+          name = name.replace(/[～~].*/, "").trim();
+        }
         dateStr = `${scheduleYear}-${month}-${day}~${scheduleYear}-${endMonth}-${endDay}`;
       } else {
         dateStr = `${scheduleYear}-${month}-${day}`;
