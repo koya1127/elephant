@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 import { parseEventsFromHtml } from "@/lib/scraper";
 import {
   sorachiConfig,
+  kushiroConfig,
+  douoConfig,
   tokachiConfig,
+  chuutairenConfig,
   gakurenConfig,
   murorikaConfig,
   orkConfig,
@@ -18,7 +21,45 @@ vi.mock("@/lib/pdfParser", () => ({
 const YEAR = 2025;
 
 // ---------------------------------------------------------------
-// muroriku (室蘭)
+// エッジケース（汎用）
+// ---------------------------------------------------------------
+describe("エッジケース", () => {
+  it("空のHTMLは0件を返す", async () => {
+    const events = await parseEventsFromHtml("<html><body></body></html>", {
+      ...sorachiConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(0);
+  });
+
+  it("全角数字の月日を正しく半角変換する（sorachi）", async () => {
+    const html = `<html><body><table>
+      <tr><td>４</td><td>１</td><td>月</td><td>全角テスト大会</td><td></td><td></td></tr>
+    </table></body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...sorachiConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-04-01");
+  });
+
+  it("【終了】マークを大会名から除去する（muroriku）", async () => {
+    const html = `<html><body>
+      <p>2025年度陸上競技大会スケジュール</p>
+      <p>6月8日（日）室蘭市陸上競技大会【終了】</p>
+    </body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...murorikaConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].name).toBe("室蘭市陸上競技大会");
+  });
+});
+
+// ---------------------------------------------------------------
+// muroriku (室蘭) — Wix、<p>ごとにパース
 // ---------------------------------------------------------------
 describe("muroriku parser", () => {
   it("単日イベントをパースできる", async () => {
@@ -35,7 +76,7 @@ describe("muroriku parser", () => {
     expect(events[0].name).toBe("室蘭市陸上競技大会");
   });
 
-  it("複数日イベントを正しくパースできる", async () => {
+  it("複数日イベント（～M月D日形式）を正しくパースできる", async () => {
     const html = `<html><body>
       <p>2025年度陸上競技大会スケジュール</p>
       <p>5月21日（水）～5月23日（金）高体連室蘭支部大会</p>
@@ -56,7 +97,7 @@ describe("muroriku parser", () => {
 // sorachi (空知) — rowspan テーブル
 // ---------------------------------------------------------------
 describe("sorachi parser", () => {
-  it("テーブルから件数と日付をパースできる", async () => {
+  it("月の最初の行と続き行を正しくパースできる", async () => {
     const html = `<html><body><table>
       <tr><td>4</td><td>1</td><td>月</td><td>空知陸上春季大会</td><td><a href="test.pdf">要項</a></td><td></td></tr>
       <tr><td>2</td><td>火</td><td>空知記録会</td><td><a href="test2.pdf">要項</a></td><td></td></tr>
@@ -71,10 +112,87 @@ describe("sorachi parser", () => {
     expect(events[1].dateText).toBe("2025-04-02");
     expect(events[1].name).toBe("空知記録会");
   });
+
+  it("「大会名」ヘッダー行をスキップする", async () => {
+    const html = `<html><body><table>
+      <tr><td>4</td><td>1</td><td>月</td><td>大会名</td><td></td><td></td></tr>
+      <tr><td>2</td><td>火</td><td>空知記録会</td><td></td><td></td></tr>
+    </table></body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...sorachiConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+  });
 });
 
 // ---------------------------------------------------------------
-// tokachi (十勝)
+// kushiro (釧路) — <th>に日付、<td>に大会名
+// ---------------------------------------------------------------
+describe("kushiro parser", () => {
+  it("単日イベントをパースできる", async () => {
+    const html = `<html><body><table>
+      <tr><th>4月29日(土)</th><td>釧路春季記録会</td><td><a href="test.pdf">要項</a></td></tr>
+    </table></body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...kushiroConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-04-29");
+    expect(events[0].name).toBe("釧路春季記録会");
+  });
+
+  it("複数日イベント（～D日形式）をパースできる", async () => {
+    const html = `<html><body><table>
+      <tr><th>5月10日(土)～11日(日)</th><td>釧路選手権</td></tr>
+    </table></body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...kushiroConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-05-10~2025-05-11");
+  });
+});
+
+// ---------------------------------------------------------------
+// douo (道央) — Jimdo、.j-module.n.j-text p から正規表現
+// ---------------------------------------------------------------
+describe("douo parser", () => {
+  it("単日イベントをパースできる", async () => {
+    const html = `<html><body>
+      <div class="j-module n j-text">
+        <p>2025年 4月19日（土） 道央春季記録会</p>
+      </div>
+    </body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...douoConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-04-19");
+    expect(events[0].name).toBe("道央春季記録会");
+  });
+
+  it("複数日イベント（～D日形式）をパースできる", async () => {
+    const html = `<html><body>
+      <div class="j-module n j-text">
+        <p>2025年 5月17日（土）～18日 道央陸上選手権</p>
+      </div>
+    </body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...douoConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-05-17~2025-05-18");
+    expect(events[0].name).toBe("道央陸上選手権");
+  });
+});
+
+// ---------------------------------------------------------------
+// tokachi (十勝) — テーブル形式
 // ---------------------------------------------------------------
 describe("tokachi parser", () => {
   it("テーブルから日付と大会名をパースできる", async () => {
@@ -90,7 +208,7 @@ describe("tokachi parser", () => {
     expect(events[0].name).toContain("春季記録会");
   });
 
-  it("複数日イベント（～）をパースできる", async () => {
+  it("複数日イベント（～D日形式）をパースできる", async () => {
     const html = `<html><body><table>
       <tr><td>7月5日(土)～6日(日)</td><td>十勝選手権</td><td>帯広緑ヶ丘</td><td></td></tr>
     </table></body></html>`;
@@ -100,6 +218,37 @@ describe("tokachi parser", () => {
     });
     expect(events).toHaveLength(1);
     expect(events[0].dateText).toBe("2025-07-05~2025-07-06");
+  });
+});
+
+// ---------------------------------------------------------------
+// chuutairen (中体連) — テーブル形式、ヘッダースキップ
+// ---------------------------------------------------------------
+describe("chuutairen parser", () => {
+  it("ヘッダー行（大会名）をスキップして正しく1件だけパースできる", async () => {
+    const html = `<html><body><table>
+      <tr><td>期日</td><td>大会名</td><td>開催地</td></tr>
+      <tr><td>5月3日(土)</td><td>中体連春季大会</td><td>函館</td><td><a href="test.pdf">要項</a></td></tr>
+    </table></body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...chuutairenConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-05-03");
+    expect(events[0].name).toContain("中体連春季大会");
+  });
+
+  it("複数日イベント（～形式）をパースできる", async () => {
+    const html = `<html><body><table>
+      <tr><td>8月1日(金)〜3日(日)</td><td>全道中学陸上</td><td>札幌</td></tr>
+    </table></body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...chuutairenConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-08-01~2025-08-03");
   });
 });
 
@@ -134,7 +283,7 @@ describe("gakuren parser", () => {
 });
 
 // ---------------------------------------------------------------
-// tomakomai (苫小牧) — 令和→西暦変換
+// tomakomai (苫小牧) — Jimdo Creator、令和→西暦変換
 // ---------------------------------------------------------------
 describe("tomakomai parser", () => {
   it("令和7年を2025年に変換できる", async () => {
@@ -155,7 +304,7 @@ describe("tomakomai parser", () => {
 });
 
 // ---------------------------------------------------------------
-// ork (オホーツク)
+// ork (オホーツク) — テーブル、月と日が別セル
 // ---------------------------------------------------------------
 describe("ork parser", () => {
   it("テーブルから件数と日付をパースできる", async () => {

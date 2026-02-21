@@ -23,4 +23,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm --filter public-web typecheck
+
       - run: pnpm --filter public-web test
