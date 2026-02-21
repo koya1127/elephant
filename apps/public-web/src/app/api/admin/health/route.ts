@@ -5,7 +5,7 @@ import { readHealth, writeHealth } from "@/lib/health-storage";
 import { checkAdmin } from "@/lib/admin";
 import type { SiteConfig, SiteHealthResult, YearHealth, ScrapedEventRaw } from "@/lib/types";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -31,83 +31,87 @@ export async function POST(request: Request) {
 
   const currentYear = new Date().getFullYear();
   const prevYear = currentYear - 1;
-  const results: SiteHealthResult[] = [];
 
-  for (const config of siteConfigs) {
-    const result: SiteHealthResult = {
-      siteId: config.id,
-      siteName: config.name,
-      checkedAt: new Date().toISOString(),
-      years: [],
-    };
+  // 全サイトを並列チェック（サイトごとに30秒タイムアウト）
+  const SITE_TIMEOUT = 30_000;
 
-    try {
-      const hasYearInUrl =
-        config.url.includes(String(currentYear)) ||
-        config.url.includes(String(prevYear));
+  const settled = await Promise.allSettled(
+    siteConfigs.map(async (config): Promise<SiteHealthResult> => {
+      const result: SiteHealthResult = {
+        siteId: config.id,
+        siteName: config.name,
+        checkedAt: new Date().toISOString(),
+        years: [],
+      };
 
-      if (hasYearInUrl) {
-        // 年依存URL: 両年を個別にチェック
-        for (const yr of [prevYear, currentYear]) {
-          const reiwa = yr - 2018;
-          const prevReiwa = prevYear - 2018;
-          const curReiwa = currentYear - 2018;
+      const siteTask = async () => {
+        const hasYearInUrl =
+          config.url.includes(String(currentYear)) ||
+          config.url.includes(String(prevYear));
 
-          // URLの年を差し替え
-          const url = config.url
-            .replace(String(currentYear), String(yr))
-            .replace(String(prevYear), String(yr))
-            .replace(`r${curReiwa}`, `r${reiwa}`)
-            .replace(`r${prevReiwa}`, `r${reiwa}`);
-          const baseUrl = config.baseUrl
-            .replace(String(currentYear), String(yr))
-            .replace(String(prevYear), String(yr));
-
-          const yearConfig: SiteConfig = {
-            ...config,
-            url,
-            baseUrl,
-            effectiveYear: yr,
-          };
-
-          const yearHealth = await checkSiteYear(yearConfig, yr);
-          result.years.push(yearHealth);
+        if (hasYearInUrl) {
+          // 年依存URL: 両年を並列チェック
+          const yearResults = await Promise.allSettled(
+            [prevYear, currentYear].map(async (yr) => {
+              const reiwa = yr - 2018;
+              const prevReiwa = prevYear - 2018;
+              const curReiwa = currentYear - 2018;
+              const url = config.url
+                .replace(String(currentYear), String(yr))
+                .replace(String(prevYear), String(yr))
+                .replace(`r${curReiwa}`, `r${reiwa}`)
+                .replace(`r${prevReiwa}`, `r${reiwa}`);
+              const baseUrl = config.baseUrl
+                .replace(String(currentYear), String(yr))
+                .replace(String(prevYear), String(yr));
+              const yearConfig: SiteConfig = { ...config, url, baseUrl, effectiveYear: yr };
+              return { yr, health: await checkSiteYear(yearConfig, yr) };
+            })
+          );
+          for (const r of yearResults) {
+            if (r.status === "fulfilled") result.years.push(r.value.health);
+          }
+        } else {
+          // 固定URL: 一括取得してイベント日付から年を振り分け
+          const events = await scrapeEvents({ ...config, effectiveYear: currentYear });
+          const byYear = new Map<number, ScrapedEventRaw[]>();
+          for (const e of events) {
+            const dateYear = parseInt(e.dateText.substring(0, 4), 10);
+            const yr = isNaN(dateYear) ? currentYear : dateYear;
+            if (!byYear.has(yr)) byYear.set(yr, []);
+            byYear.get(yr)!.push(e);
+          }
+          for (const yr of [prevYear, currentYear]) {
+            if (!byYear.has(yr)) byYear.set(yr, []);
+          }
+          for (const [yr, evts] of [...byYear.entries()].sort((a, b) => a[0] - b[0])) {
+            const pdfUrls = [...new Set(evts.map((e) => e.pdfUrl).filter((u): u is string => !!u))];
+            const pdfCheck = await checkPdfs(pdfUrls);
+            result.years.push({ year: yr, eventCount: evts.length, pdfTotal: pdfUrls.length, pdfOk: pdfCheck.ok, pdfErrors: pdfCheck.errors });
+          }
         }
-      } else {
-        // 固定URL: 一括取得してイベント日付から年を振り分け
-        const events = await scrapeEvents({ ...config, effectiveYear: currentYear });
-        const byYear = new Map<number, ScrapedEventRaw[]>();
+      };
 
-        for (const e of events) {
-          const dateYear = parseInt(e.dateText.substring(0, 4), 10);
-          const yr = isNaN(dateYear) ? currentYear : dateYear;
-          if (!byYear.has(yr)) byYear.set(yr, []);
-          byYear.get(yr)!.push(e);
-        }
-
-        // 前年と今年を最低限表示
-        for (const yr of [prevYear, currentYear]) {
-          if (!byYear.has(yr)) byYear.set(yr, []);
-        }
-
-        for (const [yr, evts] of [...byYear.entries()].sort((a, b) => a[0] - b[0])) {
-          const pdfUrls = [...new Set(evts.map((e) => e.pdfUrl).filter((u): u is string => !!u))];
-          const pdfCheck = await checkPdfs(pdfUrls);
-          result.years.push({
-            year: yr,
-            eventCount: evts.length,
-            pdfTotal: pdfUrls.length,
-            pdfOk: pdfCheck.ok,
-            pdfErrors: pdfCheck.errors,
-          });
-        }
+      try {
+        await Promise.race([
+          siteTask(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("site timeout")), SITE_TIMEOUT)
+          ),
+        ]);
+      } catch (e) {
+        result.error = String(e).slice(0, 200);
       }
-    } catch (e) {
-      result.error = String(e).slice(0, 200);
-    }
 
-    results.push(result);
-  }
+      return result;
+    })
+  );
+
+  const results: SiteHealthResult[] = settled.map((r, i) =>
+    r.status === "fulfilled"
+      ? r.value
+      : { siteId: siteConfigs[i].id, siteName: siteConfigs[i].name, checkedAt: new Date().toISOString(), years: [], error: String(r.reason).slice(0, 200) }
+  );
 
   await writeHealth(results);
 
