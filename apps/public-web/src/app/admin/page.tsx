@@ -444,7 +444,7 @@ function ScrapeTab() {
       {/* サイト別スクレイプ */}
       <div className={styles.siteGrid}>
         {Object.entries(SOURCE_LABELS).map(([siteId, info]) => {
-          const isExternal = siteId === "douo" || siteId === "koutairen" || siteId === "tomakomai" || siteId === "muroriku";
+          const isExternal = siteId === "douo" || siteId === "koutairen" || siteId === "tomakomai" || siteId === "muroriku" || siteId === "osrk";
           const status = scrapingSites[siteId];
           const isBusy = status === "HTML取得中" || status === "PDF解析中";
           return (
