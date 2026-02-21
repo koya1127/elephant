@@ -25,8 +25,9 @@ export async function scrapeEvents(
   let effectiveConfig: SiteConfig = { ...config, effectiveYear: config.effectiveYear ?? currentYear };
 
   // 前年URLを計算（年依存URLかどうか判定）
+  // replaceAll: tokachi等URLに年が複数出現するサイト対応
   const prevUrl = config.url
-    .replace(String(currentYear), String(currentYear - 1))
+    .replaceAll(String(currentYear), String(currentYear - 1))
     .replace(`r${reiwa}`, `r${reiwa - 1}`);
   const isYearDependent = !noFallback && prevUrl !== config.url;
 
@@ -42,7 +43,7 @@ export async function scrapeEvents(
       ...config,
       url: prevUrl,
       baseUrl: config.baseUrl
-        .replace(String(currentYear), String(currentYear - 1))
+        .replaceAll(String(currentYear), String(currentYear - 1))
         .replace(`r${reiwa}`, `r${reiwa - 1}`),
       effectiveYear: currentYear - 1,
     };
