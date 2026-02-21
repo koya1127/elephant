@@ -32,8 +32,8 @@ export async function POST(request: Request) {
   const currentYear = new Date().getFullYear();
   const prevYear = currentYear - 1;
 
-  // 全サイトを並列チェック（サイトごとに30秒タイムアウト）
-  const SITE_TIMEOUT = 30_000;
+  // 全サイトを並列チェック（サイトごとに60秒タイムアウト）
+  const SITE_TIMEOUT = 60_000;
 
   const settled = await Promise.allSettled(
     siteConfigs.map(async (config): Promise<SiteHealthResult> => {
