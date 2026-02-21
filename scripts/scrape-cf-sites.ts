@@ -241,11 +241,65 @@ async function parseKoutairen(html: string, baseUrl: string): Promise<ScrapedEve
 }
 
 // ---------------------------------------------------------------------------
+// Osrk パーサー (小樽後志)
+// ---------------------------------------------------------------------------
+
+const OSRK_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+async function scrapeOsrk(): Promise<ScrapedEventRaw[]> {
+  const toHalf = (s: string) =>
+    s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+
+  const apiUrl =
+    "https://osrk.jp/wp-json/wp/v2/posts?categories=4&per_page=100&orderby=date&order=desc";
+
+  const res = await fetch(apiUrl, { headers: { "User-Agent": OSRK_UA } });
+  if (!res.ok) throw new Error(`WP API status: ${res.status}`);
+
+  const posts: Array<{
+    title: { rendered: string };
+    content: { rendered: string };
+    link: string;
+  }> = await res.json();
+  console.log(`[Osrk] WP API returned ${posts.length} posts`);
+
+  const events: ScrapedEventRaw[] = [];
+
+  for (const post of posts) {
+    const $ = cheerio.load(post.content.rendered);
+    const bodyText = toHalf($.text());
+
+    const dateMatch = bodyText.match(/(\d{4})年[^月\n]*?(\d{1,2})月\s*(\d{1,2})日/);
+    if (!dateMatch) continue;
+
+    const dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[3].padStart(2, "0")}`;
+
+    let pdfUrl: string | undefined;
+    $("a").each((_, a) => {
+      if (pdfUrl) return;
+      const href = $(a).attr("href") || "";
+      const text = $(a).text().trim();
+      if (href.endsWith(".pdf") && text.includes("要項")) {
+        pdfUrl = href.startsWith("http") ? href : new URL(href, "https://osrk.jp/").toString();
+      }
+    });
+
+    const name = cheerio.load(post.title.rendered).text().trim();
+    if (!name) continue;
+
+    events.push({ name, dateText: dateStr, detailUrl: post.link, pdfUrl });
+  }
+
+  return events;
+}
+
+// ---------------------------------------------------------------------------
 // メイン処理
 // ---------------------------------------------------------------------------
 
-async function main() {
-  console.log("=== Koutairen Scraper (GitHub Actions) ===\n");
+async function scrapeKoutairen(existing: ScrapeResult[]): Promise<void> {
+  console.log("=== Koutairen Scraper ===\n");
 
   const url = "https://www.doukoutairen-rikujyou.com/%E5%A4%A7%E4%BC%9A%E6%97%A5%E7%A8%8B/";
   const baseUrl = "https://www.doukoutairen-rikujyou.com/";
@@ -287,11 +341,10 @@ async function main() {
   }
 
   if (!html) {
-    console.error("No HTML, aborting");
-    process.exit(1);
+    console.error("[Koutairen] No HTML, skipping");
+    return;
   }
 
-  // パース
   const rawEvents = await parseKoutairen(html, baseUrl);
   console.log(`[koutairen] Parsed ${rawEvents.length} events`);
 
@@ -317,9 +370,6 @@ async function main() {
     events,
   };
 
-  // Vercel Blob マージ
-  console.log("\n[Blob] Reading existing data...");
-  const existing = await readFromBlob();
   const idx = existing.findIndex((e) => e.sourceId === "koutairen");
   if (idx >= 0) {
     console.log(`[Blob] Replacing koutairen: ${existing[idx].events.length} → ${events.length} events`);
@@ -329,13 +379,81 @@ async function main() {
     existing.push(result);
   }
 
-  console.log("[Blob] Writing...");
-  await writeToBlob(existing);
-
   console.log(`\n=== Done: koutairen ${events.length} events ===`);
   for (const e of events) {
     console.log(`  - ${e.date} ${e.name}`);
   }
+}
+
+async function runOsrk(existing: ScrapeResult[]): Promise<void> {
+  console.log("\n=== Osrk Scraper (小樽後志) ===\n");
+
+  try {
+    const rawEvents = await scrapeOsrk();
+    console.log(`[osrk] Parsed ${rawEvents.length} events`);
+
+    if (rawEvents.length === 0) {
+      console.log("[osrk] 0 events, keeping existing data");
+      return;
+    }
+
+    const events: Event[] = rawEvents.map((raw) => {
+      const [dateStart, dateEnd] = raw.dateText.includes("~")
+        ? raw.dateText.split("~")
+        : [raw.dateText, undefined];
+      return {
+        id: generateId(raw.name, dateStart, "osrk"),
+        name: raw.name,
+        date: dateStart,
+        dateEnd,
+        location: extractLocationFromName(raw.name),
+        disciplines: [],
+        detailUrl: raw.detailUrl || "https://osrk.jp/",
+        sourceId: "osrk",
+      };
+    });
+
+    const result: ScrapeResult = {
+      sourceId: "osrk",
+      scrapedAt: new Date().toISOString(),
+      events,
+    };
+
+    const idx = existing.findIndex((e) => e.sourceId === "osrk");
+    if (idx >= 0) {
+      console.log(`[Blob] Replacing osrk: ${existing[idx].events.length} → ${events.length} events`);
+      existing[idx] = result;
+    } else {
+      console.log(`[Blob] Adding osrk: ${events.length} events`);
+      existing.push(result);
+    }
+
+    console.log(`\n=== Done: osrk ${events.length} events ===`);
+    for (const e of events) {
+      console.log(`  - ${e.date} ${e.name}`);
+    }
+  } catch (e) {
+    console.error("[osrk] Failed:", e);
+  }
+}
+
+async function main() {
+  console.log("=== CF Sites Scraper (GitHub Actions) ===\n");
+
+  // Vercel Blob の既存データを読み込み
+  console.log("[Blob] Reading existing data...");
+  const existing = await readFromBlob();
+
+  // koutairen (Playwright必須)
+  await scrapeKoutairen(existing);
+
+  // osrk (WP REST API、Playwright不要)
+  await runOsrk(existing);
+
+  // Blob に書き戻し
+  console.log("\n[Blob] Writing...");
+  await writeToBlob(existing);
+  console.log("[Blob] Done.");
 }
 
 main().catch((err) => {

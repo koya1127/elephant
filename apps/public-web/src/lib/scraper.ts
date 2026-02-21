@@ -1240,12 +1240,19 @@ async function parseDonan(
 
 /**
  * 小樽後志: WordPress REST API で大会情報カテゴリ(id=4)の投稿を取得
- * HTMLスクレイピングはVercelからブロックされるためAPI経由に変更
+ * osrk.jpはVercelのIPをブロックするため、GitHub Actionsで定期スクレイプ → Blob保存
+ * Vercel上では即座にスキップ（0件 → route.tsが既存Blobデータを保持）
  */
 async function parseOsrk(
   _html: string,
   config: SiteConfig
 ): Promise<ScrapedEventRaw[]> {
+  // Vercel上ではosrk.jpのWP APIがブロックされるためスキップ
+  if (process.env.VERCEL) {
+    console.log("[Osrk] Skipped on Vercel (IP blocked by osrk.jp)");
+    return [];
+  }
+
   const toHalf = (s: string) =>
     s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 
@@ -1259,11 +1266,12 @@ async function parseOsrk(
   }>;
 
   try {
-    const res = await fetch(apiUrl, { headers: { "User-Agent": UA } });
-    console.log(`[Osrk] WP API status: ${res.status}, ok: ${res.ok}`);
+    const res = await fetch(apiUrl, {
+      headers: { "User-Agent": UA },
+      signal: AbortSignal.timeout(15000),
+    });
     if (!res.ok) {
-      const body = await res.text();
-      console.error(`[Osrk] WP API error body: ${body.substring(0, 200)}`);
+      console.error(`[Osrk] WP API status: ${res.status}`);
       return [];
     }
     posts = await res.json();

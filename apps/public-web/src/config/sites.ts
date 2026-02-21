@@ -266,6 +266,7 @@ export const osrkConfig: SiteConfig = {
   name: "小樽後志陸上競技協会",
   url: "https://osrk.jp/%e7%ab%b6%e6%8a%80%e4%bc%9a%e6%83%85%e5%a0%b1/",
   baseUrl: "https://osrk.jp/",
+  useCurl: true, // Vercel IPブロック対策: GitHub Actionsで定期スクレイプ
   parser: "osrk",
   selectors: {
     eventRow: "",
