@@ -1239,77 +1239,75 @@ async function parseDonan(
 }
 
 /**
- * 小樽後志: WordPress投稿一覧から個別投稿を取得し日付・PDFを抽出
- * osrk.jp/競技会情報/ → 個別投稿（/YYYY/MM/DD/slug/）
+ * 小樽後志: WordPress REST API で大会情報カテゴリ(id=4)の投稿を取得
+ * HTMLスクレイピングはVercelからブロックされるためAPI経由に変更
  */
 async function parseOsrk(
-  html: string,
+  _html: string,
   config: SiteConfig
 ): Promise<ScrapedEventRaw[]> {
+  const toHalf = (s: string) =>
+    s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+
+  const apiUrl =
+    "https://osrk.jp/wp-json/wp/v2/posts?categories=4&per_page=100&orderby=date&order=desc";
+
+  let posts: Array<{
+    title: { rendered: string };
+    content: { rendered: string };
+    link: string;
+  }>;
+
+  try {
+    const res = await fetch(apiUrl, { headers: { "User-Agent": UA } });
+    if (!res.ok) {
+      console.error(`[Osrk] WP API returned ${res.status}`);
+      return [];
+    }
+    posts = await res.json();
+  } catch (e) {
+    console.error("[Osrk] Failed to fetch WP API:", e);
+    return [];
+  }
+
   const events: ScrapedEventRaw[] = [];
-  const $ = cheerio.load(html);
 
-  // 投稿URLを収集 (/YYYY/MM/DD/slug/)
-  const postLinks: string[] = [];
-  $("a").each((_, el) => {
-    const href = $(el).attr("href") || "";
-    if (/osrk\.jp\/\d{4}\/\d{2}\/\d{2}\//.test(href) && !postLinks.includes(href)) {
-      postLinks.push(href);
-    }
-  });
+  for (const post of posts) {
+    const $ = cheerio.load(post.content.rendered);
+    // 全角→半角変換後にテキスト検索
+    const bodyText = toHalf($.text());
 
-  if (postLinks.length === 0) return [];
+    // 日付パース: "YYYY年...M月D日" (全角→半角後)
+    // 例1: "令和8年（2026年）2月7日" → 2026-02-07
+    // 例2: "2025年（R7）10月13日" → 2025-10-13
+    const dateMatch = bodyText.match(/(\d{4})年[^月\n]*?(\d{1,2})月\s*(\d{1,2})日/);
+    if (!dateMatch) continue;
 
-  // 各投稿から日付・PDF取得（3件並列）
-  const BATCH = 3;
-  for (let i = 0; i < postLinks.length; i += BATCH) {
-    const batch = postLinks.slice(i, i + BATCH);
-    const results = await Promise.allSettled(
-      batch.map(async (postUrl) => {
-        const postHtml = await fetchHtml(postUrl);
-        const $p = cheerio.load(postHtml);
+    const dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[3].padStart(2, "0")}`;
 
-        const name = $p("h1.entry-title, h1").first().text().trim();
-        if (!name) return null;
+    // 要項PDFリンク
+    let pdfUrl: string | undefined;
+    $("a").each((_, a) => {
+      if (pdfUrl) return;
+      const href = $(a).attr("href") || "";
+      const text = $(a).text().trim();
+      if (href.endsWith(".pdf") && text.includes("要項")) {
+        pdfUrl = href.startsWith("http")
+          ? href
+          : new URL(href, config.baseUrl).toString();
+      }
+    });
 
-        const bodyText = $p(".entry-content, .article-body, main").text();
+    // タイトルのHTMLエンティティをデコード
+    const name = cheerio.load(post.title.rendered).text().trim();
+    if (!name) continue;
 
-        // 令和X年（YYYY年）M月D日
-        let dateStr: string | undefined;
-        const rMatch = bodyText.match(
-          /令和\d+年[（(](\d{4})年[）)]\s*(\d{1,2})月\s*(\d{1,2})日/
-        );
-        if (rMatch) {
-          dateStr = `${rMatch[1]}-${rMatch[2].padStart(2, "0")}-${rMatch[3].padStart(2, "0")}`;
-        }
-        if (!dateStr) {
-          const dm = bodyText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-          if (dm) {
-            dateStr = `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}`;
-          }
-        }
-        if (!dateStr) return null;
-
-        // 要項PDFリンク
-        let pdfUrl: string | undefined;
-        $p("a").each((_, a) => {
-          if (pdfUrl) return;
-          const href = $p(a).attr("href") || "";
-          const text = $p(a).text().trim();
-          if (href.endsWith(".pdf") && (text.includes("要項") || text.includes("開催要項"))) {
-            pdfUrl = href.startsWith("http")
-              ? href
-              : new URL(href, config.baseUrl).toString();
-          }
-        });
-
-        return { name, dateText: dateStr, detailUrl: postUrl, pdfUrl } as ScrapedEventRaw;
-      })
-    );
-
-    for (const r of results) {
-      if (r.status === "fulfilled" && r.value) events.push(r.value);
-    }
+    events.push({
+      name,
+      dateText: dateStr,
+      detailUrl: post.link,
+      pdfUrl,
+    });
   }
 
   return events;
