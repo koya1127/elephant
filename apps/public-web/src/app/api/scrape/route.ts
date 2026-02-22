@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { scrapeEvents, downloadPdf } from "@/lib/scraper";
 import { parsePdfWithClaude, parseExcelWithClaude } from "@/lib/pdfParser";
 import { siteConfigs } from "@/config/sites";
-import { readEvents, writeEvents, cleanupOrphanEvents } from "@/lib/storage";
+import { readEvents, writeEvents } from "@/lib/storage";
 import { checkAdmin } from "@/lib/admin";
 import { generateId, extractLocationFromName, deduplicateCrossSite } from "@/lib/event-utils";
 import type { Event, ScrapedEventRaw, ScrapeResult } from "@/lib/types";
@@ -205,27 +205,6 @@ export async function POST(request: Request) {
     }
 
     await writeEvents(existing);
-
-    // IDが変わった古いイベントを削除（名前修正で新IDが生成された場合のorphan cleanup）
-    // セーフガード: 新しいイベント数が既存の50%未満なら削除しない（PDF解析失敗時の大量削除防止）
-    for (const result of allResults) {
-      if (result.events.length === 0) continue;
-      const existingResult = existing.find((e) => e.sourceId === result.sourceId);
-      const existingCount = existingResult?.events?.length || 0;
-      if (existingCount > 0 && result.events.length < existingCount * 0.5) {
-        console.log(`[Cleanup] ${result.sourceId}: skipped (${result.events.length} < 50% of ${existingCount})`);
-        continue;
-      }
-      const currentIds = result.events.map((e) => e.id);
-      try {
-        const deleted = await cleanupOrphanEvents(result.sourceId, currentIds);
-        if (deleted > 0) {
-          console.log(`[Cleanup] ${result.sourceId}: removed ${deleted} orphan events`);
-        }
-      } catch (e) {
-        console.error(`[Cleanup] ${result.sourceId}: error`, e);
-      }
-    }
 
     const totalEvents = allResults.reduce(
       (sum, r) => sum + r.events.length,
