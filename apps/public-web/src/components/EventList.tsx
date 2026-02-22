@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
-import type { Event, Entry, ScrapeResult } from "@/lib/types";
+import type { Discipline, Event, Entry, ScrapeResult } from "@/lib/types";
+import { findHistoricalDisciplines } from "@/lib/event-utils";
 import { EventCard } from "./EventCard";
 import {
   VENUE_MAP,
@@ -258,6 +259,16 @@ export function EventList() {
       sources: sortedSources,
       venues,
     };
+  }, [events]);
+
+  // 過去大会の種目マッチング
+  const historicalDisciplinesMap = useMemo(() => {
+    const map = new Map<string, Discipline[]>();
+    for (const event of events) {
+      const hist = findHistoricalDisciplines(event, events);
+      if (hist) map.set(event.id, hist);
+    }
+    return map;
   }, [events]);
 
   // Apply filters
@@ -665,6 +676,7 @@ export function EventList() {
                   highlightGrades={selectedGrades}
                   normalizeGrade={normalizeGradeCategory}
                   enteredEventIds={enteredEventIds}
+                  historicalDisciplines={historicalDisciplinesMap.get(event.id)}
                 />
               ))}
             </section>

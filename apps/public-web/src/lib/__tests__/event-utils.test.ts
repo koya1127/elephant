@@ -8,6 +8,8 @@ import {
   pickKeeper,
   mergeEventInfo,
   deduplicateCrossSite,
+  normalizeForHistoricalMatch,
+  findHistoricalDisciplines,
 } from "@/lib/event-utils";
 import type { Event, ScrapeResult } from "@/lib/types";
 
@@ -317,5 +319,111 @@ describe("deduplicateCrossSite", () => {
     deduplicateCrossSite(results, existing);
     expect(results[0].events).toHaveLength(1);
     expect(existing[0].events).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeForHistoricalMatch
+// ---------------------------------------------------------------------------
+describe("normalizeForHistoricalMatch", () => {
+  it("「第N回」を除去する", () => {
+    expect(normalizeForHistoricalMatch("第38回南部忠平記念陸上競技大会")).toBe("南部忠平記念陸上競技大会");
+  });
+
+  it("「令和X年度」を除去する（漢数字）", () => {
+    expect(normalizeForHistoricalMatch("令和七年度空知記録会")).toBe("空知記録会");
+  });
+
+  it("「令和X年」を除去する（数字）", () => {
+    expect(normalizeForHistoricalMatch("令和7年空知記録会")).toBe("空知記録会");
+  });
+
+  it("「20XX年」を除去する（先頭以外含む）", () => {
+    expect(normalizeForHistoricalMatch("空知2025年記録会")).toBe("空知記録会");
+    expect(normalizeForHistoricalMatch("2025年空知記録会")).toBe("空知記録会");
+  });
+
+  it("「兼」以降を除去する", () => {
+    expect(normalizeForHistoricalMatch("第38回南部忠平記念陸上競技大会 兼 第98回北海道陸上競技選手権大会"))
+      .toBe("南部忠平記念陸上競技大会");
+  });
+
+  it("改行を除去する", () => {
+    expect(normalizeForHistoricalMatch("空知記録会\n第1戦")).toBe("空知記録会第1戦");
+  });
+
+  it("複合的なケース", () => {
+    expect(normalizeForHistoricalMatch("第10回 2025年 空知記録会 兼 北海道選手権"))
+      .toBe("空知記録会");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findHistoricalDisciplines
+// ---------------------------------------------------------------------------
+describe("findHistoricalDisciplines", () => {
+  const makeEvent = (overrides: Partial<Event>): Event => ({
+    id: "test-id",
+    name: "テスト大会",
+    date: "2026-06-01",
+    location: "",
+    disciplines: [],
+    detailUrl: "",
+    sourceId: "sorachi",
+    ...overrides,
+  });
+
+  it("同一ソース・異なる年の同名大会からdisciplinesを取得する", () => {
+    const current = makeEvent({ id: "s1", name: "第39回空知記録会", date: "2026-06-01", disciplines: [] });
+    const past = makeEvent({
+      id: "s2", name: "第38回空知記録会", date: "2025-06-01",
+      disciplines: [{ name: "100m", grades: ["一般"] }, { name: "200m", grades: ["一般"] }],
+    });
+    const result = findHistoricalDisciplines(current, [current, past]);
+    expect(result).toHaveLength(2);
+    expect(result![0].name).toBe("100m");
+  });
+
+  it("disciplinesが既にある場合はnullを返す", () => {
+    const current = makeEvent({
+      id: "s1", name: "空知記録会", date: "2026-06-01",
+      disciplines: [{ name: "100m", grades: [] }],
+    });
+    const result = findHistoricalDisciplines(current, [current]);
+    expect(result).toBeNull();
+  });
+
+  it("異なるソースの大会はマッチしない", () => {
+    const current = makeEvent({ id: "s1", name: "第39回空知記録会", date: "2026-06-01", sourceId: "sorachi" });
+    const past = makeEvent({
+      id: "h1", name: "第38回空知記録会", date: "2025-06-01", sourceId: "hokkaido",
+      disciplines: [{ name: "100m", grades: [] }],
+    });
+    const result = findHistoricalDisciplines(current, [current, past]);
+    expect(result).toBeNull();
+  });
+
+  it("同じ年のイベントはマッチしない", () => {
+    const current = makeEvent({ id: "s1", name: "空知記録会", date: "2026-06-01" });
+    const sameYear = makeEvent({
+      id: "s2", name: "空知記録会", date: "2026-07-01",
+      disciplines: [{ name: "100m", grades: [] }],
+    });
+    const result = findHistoricalDisciplines(current, [current, sameYear]);
+    expect(result).toBeNull();
+  });
+
+  it("複数年のマッチがある場合、最新年のdisciplinesを返す", () => {
+    const current = makeEvent({ id: "s1", name: "第40回空知記録会", date: "2026-06-01" });
+    const old = makeEvent({
+      id: "s2", name: "第38回空知記録会", date: "2024-06-01",
+      disciplines: [{ name: "100m", grades: [] }],
+    });
+    const newer = makeEvent({
+      id: "s3", name: "第39回空知記録会", date: "2025-06-01",
+      disciplines: [{ name: "100m", grades: [] }, { name: "200m", grades: [] }],
+    });
+    const result = findHistoricalDisciplines(current, [current, old, newer]);
+    expect(result).toHaveLength(2);
   });
 });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Event } from "@/lib/types";
+import type { Discipline, Event } from "@/lib/types";
 import { EntryButton } from "./EntryButton";
 import styles from "./EventCard.module.css";
 
@@ -13,6 +13,8 @@ interface EventCardProps {
   normalizeGrade?: (raw: string) => string;
   /** エントリー済みイベントIDセット */
   enteredEventIds?: Set<string>;
+  /** 過去大会から取得した参考種目 */
+  historicalDisciplines?: Discipline[] | null;
 }
 
 const DOW = ["日", "月", "火", "水", "木", "金", "土"] as const;
@@ -23,6 +25,7 @@ export function EventCard({
   highlightGrades,
   normalizeGrade,
   enteredEventIds,
+  historicalDisciplines,
 }: EventCardProps) {
   const [showAllTags, setShowAllTags] = useState(false);
   const { month, day, dow } = parseDate(event.date);
@@ -150,6 +153,37 @@ export function EventCard({
           {event.note && (
             <div className={styles.note}>{stringify(event.note)}</div>
           )}
+        </div>
+      )}
+
+      {/* 例年の種目（参考） */}
+      {event.disciplines.length === 0 && historicalDisciplines && historicalDisciplines.length > 0 && (
+        <div className={styles.historicalDisciplines}>
+          <div className={styles.historicalDiscHeader}>
+            例年の種目（参考・{historicalDisciplines.length}種目）
+          </div>
+          <div className={styles.discGrid}>
+            {historicalDisciplines.slice(0, showAllTags ? undefined : 10).map((d, i) => {
+              const grades = normalizeGradesArr(d.grades);
+              return (
+                <span key={i} className={styles.historicalDiscTag}>
+                  {String(d.name || "")}
+                  {grades.length > 0 && (
+                    <span className={styles.discGrade}>{grades.join(" / ")}</span>
+                  )}
+                </span>
+              );
+            })}
+            {!showAllTags && historicalDisciplines.length > 10 && (
+              <button
+                onClick={() => setShowAllTags(true)}
+                className={styles.historicalDiscTag}
+                style={{ cursor: "pointer", background: "#f5f5f4", color: "#78716c" }}
+              >
+                + 他{historicalDisciplines.length - 10}件
+              </button>
+            )}
+          </div>
         </div>
       )}
     </article>
