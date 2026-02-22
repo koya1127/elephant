@@ -238,9 +238,25 @@ export async function parseSchedulePdfWithClaude(
     throw new Error("Expected JSON array from Claude API");
   }
 
-  return raw.filter(
-    (e: Record<string, unknown>) => e.name && e.date
-  ) as ScheduleEvent[];
+  return raw
+    .filter((e: Record<string, unknown>) => e.name && e.date)
+    .map((e: Record<string, unknown>) => ({
+      ...e,
+      name: cleanDoubledName(String(e.name)),
+    })) as ScheduleEvent[];
+}
+
+/**
+ * Claude APIが返す大会名の二重化を修正する
+ * 例: "第53回第53回室内陸上競技大会" → "第53回室内陸上競技大会"
+ * 例: "20252025北海道マラソン" → "2025北海道マラソン"
+ */
+export function cleanDoubledName(name: string): string {
+  // 「第N回第N回」→「第N回」
+  let cleaned = name.replace(/(第\d+回)\1/g, "$1");
+  // 「XXXXYYYY」(同じ4桁年が連続) → 「XXXX」
+  cleaned = cleaned.replace(/(20\d{2})\1/g, "$1");
+  return cleaned;
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   normalizeString,
   normalizeFee,
   normalizePdfResult,
+  cleanDoubledName,
 } from "@/lib/pdfParser";
 
 // ---------------------------------------------------------------------------
@@ -213,5 +214,30 @@ describe("normalizePdfResult", () => {
     const result = normalizePdfResult({});
     expect(result.location).toBe("");
     expect(result.disciplines).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cleanDoubledName
+// ---------------------------------------------------------------------------
+describe("cleanDoubledName", () => {
+  it("「第N回第N回」を「第N回」に修正する", () => {
+    expect(cleanDoubledName("第53回第53回室内陸上競技大会")).toBe("第53回室内陸上競技大会");
+  });
+
+  it("年号の二重化を修正する", () => {
+    expect(cleanDoubledName("20252025北海道マラソン")).toBe("2025北海道マラソン");
+  });
+
+  it("異なる回次は変更しない", () => {
+    expect(cleanDoubledName("第52回第53回大会")).toBe("第52回第53回大会");
+  });
+
+  it("正常な名前はそのまま返す", () => {
+    expect(cleanDoubledName("第53回室内陸上競技大会")).toBe("第53回室内陸上競技大会");
+  });
+
+  it("年号が1回だけの場合はそのまま", () => {
+    expect(cleanDoubledName("2025北海道マラソン")).toBe("2025北海道マラソン");
   });
 });
