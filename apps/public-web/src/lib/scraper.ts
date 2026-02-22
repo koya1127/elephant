@@ -57,6 +57,15 @@ export async function scrapeEvents(
     await applyPrevYear();
   }
 
+  // 固定URLサイト: HTMLコンテンツから年を自動検出
+  if (!isYearDependent && html) {
+    const detectedYear = detectYearFromContent(html, currentYear);
+    if (detectedYear !== currentYear) {
+      console.log(`[YearDetect] ${config.id}: detected year ${detectedYear} from content (default was ${currentYear})`);
+      effectiveConfig = { ...effectiveConfig, effectiveYear: detectedYear };
+    }
+  }
+
   // 札幌は要項ページも取得して2段階でパース
   if (effectiveConfig.parser === "sapporo" && effectiveConfig.guidelineUrl) {
     const guidelineHtml = await fetchHtml(effectiveConfig.guidelineUrl);
@@ -154,6 +163,35 @@ export async function downloadPdf(url: string): Promise<Buffer> {
     throw new Error(`Not a valid PDF (got HTML or other content): ${url}`);
   }
   return buffer;
+}
+
+/**
+ * HTMLコンテンツから年を自動検出する
+ * 「YYYY年」「令和N年」のパターンを集計し、最頻出の年を返す
+ */
+export function detectYearFromContent(html: string, defaultYear: number): number {
+  const years: number[] = [];
+  const minYear = defaultYear - 2;
+  const maxYear = defaultYear + 1;
+
+  // 西暦パターン: "2025年", "2025年度"
+  for (const m of html.matchAll(/(\d{4})年/g)) {
+    const y = parseInt(m[1], 10);
+    if (y >= minYear && y <= maxYear) years.push(y);
+  }
+
+  // 令和パターン: "令和7年"
+  for (const m of html.matchAll(/令和(\d+)年/g)) {
+    const y = 2018 + parseInt(m[1], 10);
+    if (y >= minYear && y <= maxYear) years.push(y);
+  }
+
+  if (years.length === 0) return defaultYear;
+
+  // 最頻出の年を返す
+  const counts = new Map<number, number>();
+  for (const y of years) counts.set(y, (counts.get(y) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
 }
 
 export async function parseEventsFromHtml(

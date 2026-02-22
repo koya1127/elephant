@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { parseEventsFromHtml } from "@/lib/scraper";
+import { parseEventsFromHtml, detectYearFromContent } from "@/lib/scraper";
 import {
   sorachiConfig,
   kushiroConfig,
@@ -323,5 +323,40 @@ describe("ork parser", () => {
     expect(events[0].dateText).toBe("2025-04-20");
     expect(events[0].name).toContain("オホーツク春季大会");
     expect(events[1].dateText).toBe("2025-09-06~2025-09-07");
+  });
+});
+
+// ---------------------------------------------------------------
+// detectYearFromContent — HTMLから年を自動検出
+// ---------------------------------------------------------------
+describe("detectYearFromContent", () => {
+  it("「2025年度」が複数あれば2025を返す", () => {
+    const html = `<p>2025年度陸上競技スケジュール</p><p>2025年度第1回記録会</p>`;
+    expect(detectYearFromContent(html, 2026)).toBe(2025);
+  });
+
+  it("「令和7年」→ 2025を返す", () => {
+    const html = `<p>令和7年度大会日程</p><p>令和7年4月20日開催</p>`;
+    expect(detectYearFromContent(html, 2026)).toBe(2025);
+  });
+
+  it("年パターンなし → defaultYearを返す", () => {
+    const html = `<p>大会スケジュール一覧</p>`;
+    expect(detectYearFromContent(html, 2026)).toBe(2026);
+  });
+
+  it("混在時は最頻出を返す", () => {
+    const html = `<p>2025年度スケジュール</p><p>2025年5月大会</p><p>2026年1月記録会</p>`;
+    expect(detectYearFromContent(html, 2026)).toBe(2025);
+  });
+
+  it("現在年のコンテンツならdefaultYearと同じ値を返す", () => {
+    const html = `<p>2026年度大会日程</p><p>2026年4月記録会</p>`;
+    expect(detectYearFromContent(html, 2026)).toBe(2026);
+  });
+
+  it("範囲外の年は無視する", () => {
+    const html = `<p>2020年の記録</p><p>2025年度スケジュール</p>`;
+    expect(detectYearFromContent(html, 2026)).toBe(2025);
   });
 });
