@@ -1,5 +1,5 @@
 import { siteConfigs } from "@/config/sites";
-import type { Event, ScrapeResult } from "./types";
+import type { Discipline, Event, ScrapeResult } from "./types";
 
 export function generateId(name: string, date: string, sourceId: string): string {
   const slug = name
@@ -23,6 +23,51 @@ export function normalizeName(name: string): string {
     .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
     .replace(/[Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
     .replace(/^20\d{2}/, ""); // 先頭の年号を除去（「2025苫小牧記録会」→「苫小牧記録会」）
+}
+
+/**
+ * 過去大会マッチング用の正規化（回次・年度・兼以降を除去）
+ */
+export function normalizeForHistoricalMatch(name: string): string {
+  return name
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/[Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/20\d{2}年?/g, "")
+    .replace(/第\d+回/g, "")
+    .replace(/令和[一二三四五六七八九十\d]+年度?/g, "")
+    .replace(/\n/g, "")
+    .replace(/兼.*$/, "");
+}
+
+/**
+ * 過去の同名大会から種目を取得する（同一ソース内のみ）
+ * disciplinesが空のイベントに対し、異なる年の同名大会のdisciplinesを返す
+ */
+export function findHistoricalDisciplines(
+  event: Event,
+  allEvents: Event[]
+): Discipline[] | null {
+  if (event.disciplines.length > 0) return null;
+
+  const eventYear = event.date.slice(0, 4);
+  const normalized = normalizeForHistoricalMatch(event.name);
+  if (normalized.length < 3) return null;
+
+  // 同一sourceId、異なる年、disciplines有りのイベントを候補に
+  const candidates = allEvents.filter(
+    (e) =>
+      e.sourceId === event.sourceId &&
+      e.date.slice(0, 4) !== eventYear &&
+      e.disciplines.length > 0 &&
+      normalizeForHistoricalMatch(e.name) === normalized
+  );
+
+  if (candidates.length === 0) return null;
+
+  // 最新年のものを返す
+  candidates.sort((a, b) => b.date.localeCompare(a.date));
+  return candidates[0].disciplines;
 }
 
 /**
