@@ -118,6 +118,8 @@ export interface SiteConfig {
   id: string;
   /** サイト名 */
   name: string;
+  /** UI表示ラベル */
+  label: { short: string; region: string };
   /** スクレイピング対象URL */
   url: string;
   /** スケジュールPDF一覧ページURL（北海道など） */

@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { execSync } from "child_process";
 import { parseSchedulePdfWithClaude } from "./pdfParser";
+import { toHalfWidth } from "./text-utils";
 import type { SiteConfig, ScrapedEventRaw } from "./types";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -54,6 +55,15 @@ export async function scrapeEvents(
   // HTML空の場合は即フォールバック
   if (isYearDependent && (!html || html.trim() === "")) {
     await applyPrevYear();
+  }
+
+  // 固定URLサイト: HTMLコンテンツから年を自動検出
+  if (!isYearDependent && html) {
+    const detectedYear = detectYearFromContent(html, currentYear);
+    if (detectedYear !== currentYear) {
+      console.log(`[YearDetect] ${config.id}: detected year ${detectedYear} from content (default was ${currentYear})`);
+      effectiveConfig = { ...effectiveConfig, effectiveYear: detectedYear };
+    }
   }
 
   // 札幌は要項ページも取得して2段階でパース
@@ -155,6 +165,35 @@ export async function downloadPdf(url: string): Promise<Buffer> {
   return buffer;
 }
 
+/**
+ * HTMLコンテンツから年を自動検出する
+ * 「YYYY年」「令和N年」のパターンを集計し、最頻出の年を返す
+ */
+export function detectYearFromContent(html: string, defaultYear: number): number {
+  const years: number[] = [];
+  const minYear = defaultYear - 2;
+  const maxYear = defaultYear + 1;
+
+  // 西暦パターン: "2025年", "2025年度"
+  for (const m of html.matchAll(/(\d{4})年/g)) {
+    const y = parseInt(m[1], 10);
+    if (y >= minYear && y <= maxYear) years.push(y);
+  }
+
+  // 令和パターン: "令和7年"
+  for (const m of html.matchAll(/令和(\d+)年/g)) {
+    const y = 2018 + parseInt(m[1], 10);
+    if (y >= minYear && y <= maxYear) years.push(y);
+  }
+
+  if (years.length === 0) return defaultYear;
+
+  // 最頻出の年を返す
+  const counts = new Map<number, number>();
+  for (const y of years) counts.set(y, (counts.get(y) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
 export async function parseEventsFromHtml(
   html: string,
   config: SiteConfig,
@@ -204,8 +243,8 @@ export async function parseEventsFromHtml(
       if (name === "大会名") return;
 
       // 全角→半角
-      month = month.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
-      day = day.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
+      month = toHalfWidth(month);
+      day = toHalfWidth(day);
 
       // 日の範囲対応 "3-4" → dateEnd
       const dayMatch = day.match(/(\d+)(?:-(\d+))?/);
@@ -244,9 +283,7 @@ export async function parseEventsFromHtml(
         : undefined;
 
       if (dateText && name) {
-        const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
-          String.fromCharCode(s.charCodeAt(0) - 0xfee0)
-        );
+        const normalizedDate = toHalfWidth(dateText);
         // 釧路: "4月29日(土)"
         // 4月29日(土)～30日(日)
         const dateMatch = normalizedDate.match(/(\d+)月(\d+)日/);
@@ -324,9 +361,7 @@ export async function parseEventsFromHtml(
       if (!dateText || !name) return;
 
       // 全角→半角
-      const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
-        String.fromCharCode(s.charCodeAt(0) - 0xfee0)
-      );
+      const normalizedDate = toHalfWidth(dateText);
 
       // "3月22日(土)" or "7月5日(土)～6日(日)"
       const dateMatch = normalizedDate.match(/(\d+)月(\d+)日/);
@@ -378,9 +413,7 @@ export async function parseEventsFromHtml(
       // ヘッダー行スキップ
       if (name.includes("大　会　名") || name.includes("大会名")) return;
 
-      const normalizedDate = dateText.replace(/[０-９]/g, (s) =>
-        String.fromCharCode(s.charCodeAt(0) - 0xfee0)
-      );
+      const normalizedDate = toHalfWidth(dateText);
 
       const dateMatch = normalizedDate.match(/(\d+)月(\d+)日/);
       if (!dateMatch) return;
@@ -457,10 +490,6 @@ export async function parseEventsFromHtml(
     // 左カラム: 大会名（font-size:22px）+ 開催日（赤文字、令和表記）
     // 後続の .j-imageSubtitle: 要項PDFリンク
 
-    // 全角数字→半角変換ヘルパー
-    const toHalf = (s: string) =>
-      s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
-
     // 令和→西暦変換ヘルパー
     const reiwToYear = (r: number) => 2018 + r;
 
@@ -514,7 +543,7 @@ export async function parseEventsFromHtml(
       if (!dateText) return;
 
       // 令和日付をパース
-      const normalized = toHalf(dateText);
+      const normalized = toHalfWidth(dateText);
       const reiwaMatch = normalized.match(/令和(\d+)年(\d+)月(\d+)日/);
       if (!reiwaMatch) return;
 
@@ -585,18 +614,16 @@ export async function parseEventsFromHtml(
   } else if (config.parser === "muroriku") {
     // 室蘭: Wixサイト、プレーンテキスト形式
     // Wix SPAはcheerio $.text()で改行が入らないため、<p>要素ごとに処理
-    const toHalf = (s: string) =>
-      s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 
     // 年度抽出（全体テキストから）
-    const fullText = toHalf($.text());
+    const fullText = toHalfWidth($.text());
     const yearMatch2 = fullText.match(/(\d{4})年度/);
     const scheduleYear = yearMatch2 ? parseInt(yearMatch2[1]) : year;
 
     // <p>要素ごとにテキストを取り出してパース（&nbsp; → space変換含む）
     const lines: string[] = [];
     $("p").each((_, el) => {
-      const t = toHalf($(el).text().replace(/\u00a0/g, " ").trim());
+      const t = toHalfWidth($(el).text().replace(/\u00a0/g, " ").trim());
       if (t) lines.push(t);
     });
 
@@ -1230,9 +1257,7 @@ async function fetchDohokuYoukoPdfs(
       if (!dateRaw || !youkoLink) return;
 
       // 全角数字→半角変換
-      const dateNorm = dateRaw.replace(/[０-９]/g, (ch) =>
-        String.fromCharCode(ch.charCodeAt(0) - 0xfee0)
-      );
+      const dateNorm = toHalfWidth(dateRaw);
 
       // "5月10日", "8月23-24日", "10月　4日" などから月・開始日を抽出
       const dm = dateNorm.match(/(\d{1,2})月\s*(\d{1,2})/);
@@ -1251,6 +1276,44 @@ async function fetchDohokuYoukoPdfs(
   }
 
   return map;
+}
+
+/**
+ * 個別ページから要項PDFリンクを取得する共通ヘルパー（ork / donan 共通）
+ */
+async function fetchDetailPdfUrls(
+  events: ScrapedEventRaw[],
+  baseUrl: string,
+  fallbackUrl: string,
+  batchSize = 3
+): Promise<void> {
+  for (let i = 0; i < events.length; i += batchSize) {
+    const batch = events.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (ev) => {
+        if (!ev.detailUrl || ev.detailUrl === fallbackUrl) return;
+        try {
+          const dHtml = await fetchHtml(ev.detailUrl);
+          const $d = cheerio.load(dHtml);
+          $d("a").each((_, a) => {
+            if (ev.pdfUrl) return;
+            const href = $d(a).attr("href") || "";
+            const text = $d(a).text().trim();
+            if (
+              href.endsWith(".pdf") &&
+              (text.includes("要項") || text.includes("開催要項"))
+            ) {
+              ev.pdfUrl = href.startsWith("http")
+                ? href
+                : new URL(href, baseUrl).toString();
+            }
+          });
+        } catch {
+          // 詳細ページ取得失敗は無視
+        }
+      })
+    );
+  }
 }
 
 /**
@@ -1306,35 +1369,7 @@ async function parseOrk(
     });
   });
 
-  // 個別ページから要項PDFリンクを取得（3件並列）
-  const BATCH = 3;
-  for (let i = 0; i < events.length; i += BATCH) {
-    const batch = events.slice(i, i + BATCH);
-    await Promise.all(
-      batch.map(async (ev) => {
-        if (!ev.detailUrl || ev.detailUrl === config.url) return;
-        try {
-          const dHtml = await fetchHtml(ev.detailUrl);
-          const $d = cheerio.load(dHtml);
-          $d("a").each((_, a) => {
-            if (ev.pdfUrl) return;
-            const href = $d(a).attr("href") || "";
-            const text = $d(a).text().trim();
-            if (
-              href.endsWith(".pdf") &&
-              (text.includes("要項") || text.includes("開催要項"))
-            ) {
-              ev.pdfUrl = href.startsWith("http")
-                ? href
-                : new URL(href, config.baseUrl).toString();
-            }
-          });
-        } catch {
-          // 詳細ページ取得失敗は無視
-        }
-      })
-    );
-  }
+  await fetchDetailPdfUrls(events, config.baseUrl, config.url);
 
   return events;
 }
@@ -1392,35 +1427,7 @@ async function parseDonan(
     parseListHtml(pageHtml);
   }
 
-  // 個別ページから要項PDFリンクを取得（3件並列）
-  const BATCH = 3;
-  for (let i = 0; i < events.length; i += BATCH) {
-    const batch = events.slice(i, i + BATCH);
-    await Promise.all(
-      batch.map(async (ev) => {
-        if (!ev.detailUrl || ev.detailUrl === config.url) return;
-        try {
-          const dHtml = await fetchHtml(ev.detailUrl);
-          const $d = cheerio.load(dHtml);
-          $d("a").each((_, a) => {
-            if (ev.pdfUrl) return;
-            const href = $d(a).attr("href") || "";
-            const text = $d(a).text().trim();
-            if (
-              href.endsWith(".pdf") &&
-              (text.includes("要項") || text.includes("開催要項"))
-            ) {
-              ev.pdfUrl = href.startsWith("http")
-                ? href
-                : new URL(href, config.baseUrl).toString();
-            }
-          });
-        } catch {
-          // 詳細ページ取得失敗は無視
-        }
-      })
-    );
-  }
+  await fetchDetailPdfUrls(events, config.baseUrl, config.url);
 
   return events;
 }
@@ -1439,9 +1446,6 @@ async function parseOsrk(
     console.log("[Osrk] Skipped on Vercel (IP blocked by osrk.jp)");
     return [];
   }
-
-  const toHalf = (s: string) =>
-    s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 
   const apiUrl =
     "https://osrk.jp/wp-json/wp/v2/posts?categories=4&per_page=100&orderby=date&order=desc";
@@ -1473,7 +1477,7 @@ async function parseOsrk(
   for (const post of posts) {
     const $ = cheerio.load(post.content.rendered);
     // 全角→半角変換後にテキスト検索
-    const bodyText = toHalf($.text());
+    const bodyText = toHalfWidth($.text());
 
     // 日付パース: "YYYY年...M月D日" (全角→半角後)
     // 例1: "令和8年（2026年）2月7日" → 2026-02-07

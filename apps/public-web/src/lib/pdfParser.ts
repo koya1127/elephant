@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
 import * as XLSX from "xlsx";
 import type { Discipline } from "./types";
 
@@ -26,57 +27,66 @@ interface PdfParseResult {
   note?: string;
 }
 
+/** Anthropic クライアントを取得（API key チェック込み） */
+function getClaudeClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+  return new Anthropic({ apiKey });
+}
+
+/** Claude API レスポンスからテキストを取得 */
+function extractText(response: Anthropic.Message): string {
+  const textBlock = response.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("No text response from Claude API");
+  }
+  return textBlock.text;
+}
+
+/** レスポンステキストからコードブロックを除去してJSON文字列を取得 */
+function extractJsonStr(text: string): string {
+  let jsonStr = text.trim();
+  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)(?:```|$)/);
+  if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+  return jsonStr;
+}
+
+/** Claude API を呼び出してテキスト応答を返す */
+async function callClaude(
+  messages: MessageParam[],
+  maxTokens = 4096
+): Promise<string> {
+  const client = getClaudeClient();
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: maxTokens,
+    messages,
+  });
+  return extractText(response);
+}
+
 /**
  * Claude APIでPDFの内容を解析してJSON化する
  */
 export async function parsePdfWithClaude(
   pdfBuffer: Buffer
 ): Promise<PdfParseResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not set");
-  }
-
-  const client = new Anthropic({ apiKey });
-
   const base64Pdf = pdfBuffer.toString("base64");
 
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 4096,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: base64Pdf,
-            },
-          },
-          {
-            type: "text",
-            text: PARSE_PROMPT,
-          },
-        ],
-      },
-    ],
-  });
+  const text = await callClaude([
+    {
+      role: "user",
+      content: [
+        {
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: base64Pdf },
+        },
+        { type: "text", text: PARSE_PROMPT },
+      ],
+    },
+  ]);
 
-  const textBlock = response.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text response from Claude API");
-  }
-
-  // JSONパース（コードブロックで囲まれている場合も対応）
-  let jsonStr = textBlock.text.trim();
-  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    jsonStr = codeBlockMatch[1].trim();
-  }
-
+  const jsonStr = extractJsonStr(text);
   let raw;
   try {
     raw = JSON.parse(jsonStr);
@@ -191,49 +201,25 @@ interface ScheduleEvent {
 export async function parseSchedulePdfWithClaude(
   pdfBuffer: Buffer
 ): Promise<ScheduleEvent[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not set");
-  }
-
-  const client = new Anthropic({ apiKey });
   const base64Pdf = pdfBuffer.toString("base64");
 
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 16384,
-    messages: [
+  const text = await callClaude(
+    [
       {
         role: "user",
         content: [
           {
             type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: base64Pdf,
-            },
+            source: { type: "base64", media_type: "application/pdf", data: base64Pdf },
           },
-          {
-            type: "text",
-            text: SCHEDULE_PROMPT,
-          },
+          { type: "text", text: SCHEDULE_PROMPT },
         ],
       },
     ],
-  });
+    16384
+  );
 
-  const textBlock = response.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text response from Claude API");
-  }
-
-  let jsonStr = textBlock.text.trim();
-  // コードブロックで囲まれている場合（閉じがない場合も対応）
-  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)(?:```|$)/);
-  if (codeBlockMatch) {
-    jsonStr = codeBlockMatch[1].trim();
-  }
+  let jsonStr = extractJsonStr(text);
   // 先頭の [ を見つけて切り出す（前後の余計なテキストを除去）
   const arrStart = jsonStr.indexOf("[");
   const arrEnd = jsonStr.lastIndexOf("]");
@@ -263,11 +249,6 @@ export async function parseSchedulePdfWithClaude(
 export async function parseExcelWithClaude(
   buffer: Buffer
 ): Promise<PdfParseResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not set");
-  }
-
   // Excelをテキストに変換
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const textParts: string[] = [];
@@ -284,30 +265,14 @@ export async function parseExcelWithClaude(
     return { location: "", disciplines: [] };
   }
 
-  const client = new Anthropic({ apiKey });
+  const text = await callClaude([
+    {
+      role: "user",
+      content: `以下は大会要項のExcelファイルの内容です。\n\n${excelText}\n\n${PARSE_PROMPT}`,
+    },
+  ]);
 
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 4096,
-    messages: [
-      {
-        role: "user",
-        content: `以下は大会要項のExcelファイルの内容です。\n\n${excelText}\n\n${PARSE_PROMPT}`,
-      },
-    ],
-  });
-
-  const textBlock = response.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text response from Claude API");
-  }
-
-  let jsonStr = textBlock.text.trim();
-  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    jsonStr = codeBlockMatch[1].trim();
-  }
-
+  const jsonStr = extractJsonStr(text);
   let raw;
   try {
     raw = JSON.parse(jsonStr);
