@@ -247,4 +247,10 @@ export function mergeEventInfo(keeper: Event, loser: Event): void {
     keeper.entryDeadline = loser.entryDeadline;
   if (!keeper.pdfSize && loser.pdfSize) keeper.pdfSize = loser.pdfSize;
   if (!keeper.note && loser.note) keeper.note = loser.note;
+  if (keeper.fee == null && loser.fee != null) {
+    keeper.fee = loser.fee;
+    keeper.feeSource = loser.feeSource;
+  }
+  if (keeper.actualFee == null && loser.actualFee != null)
+    keeper.actualFee = loser.actualFee;
 }
