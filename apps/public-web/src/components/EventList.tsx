@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
 import type { Discipline, Event, Entry, ScrapeResult } from "@/lib/types";
-import { findHistoricalDisciplines } from "@/lib/event-utils";
+import { findHistoricalDisciplines, normalizeForHistoricalMatch } from "@/lib/event-utils";
 import { EventCard } from "./EventCard";
 import {
   VENUE_MAP,
@@ -376,6 +376,97 @@ export function EventList() {
 
   const eventsByMonth = groupByMonth(filteredEvents);
 
+  // 昨年あって今年まだない個別大会を月ごとに収集
+  const lastYearReferenceByMonth = useMemo(() => {
+    if (showPastEvents) return new Map<string, Event[]>();
+
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const lastYear = currentYear - 1;
+    const currentMonth = today.getMonth() + 1;
+
+    // 今年のイベント名を月ごとに正規化して収集
+    const currentYearNamesByMonth = new Map<string, Set<string>>();
+    for (const event of events) {
+      const [y, m] = event.date.split("-");
+      if (Number(y) === currentYear) {
+        if (!currentYearNamesByMonth.has(m)) currentYearNamesByMonth.set(m, new Set());
+        currentYearNamesByMonth.get(m)!.add(normalizeForHistoricalMatch(event.name));
+      }
+    }
+
+    const result = new Map<string, Event[]>();
+    for (let i = 0; i < 6; i++) {
+      const m = ((currentMonth - 1 + i) % 12) + 1;
+      const y = currentYear + Math.floor((currentMonth - 1 + i) / 12);
+      if (y !== currentYear) continue;
+
+      const monthStr = String(m).padStart(2, "0");
+      const currentNames = currentYearNamesByMonth.get(monthStr) || new Set();
+
+      const unmatched = events.filter(e => {
+        const [ey, em] = e.date.split("-");
+        if (Number(ey) !== lastYear || em !== monthStr) return false;
+        return !currentNames.has(normalizeForHistoricalMatch(e.name));
+      });
+
+      if (unmatched.length > 0) {
+        unmatched.sort((a, b) => a.date.localeCompare(b.date));
+        result.set(`${y}年${m}月`, unmatched);
+      }
+    }
+
+    return result;
+  }, [events, showPastEvents]);
+
+  // 通常セクションに昨年実績を統合
+  const allSections = useMemo(() => {
+    type Section = {
+      key: string;
+      monthNum: number;
+      sortKey: string;
+      label: string;
+      events: Event[];
+      referenceEvents: Event[];
+    };
+
+    const sections = new Map<string, Section>();
+
+    for (const [month, monthEvents] of Object.entries(eventsByMonth)) {
+      const match = month.match(/(\d{4})年(\d+)月/);
+      if (match) {
+        sections.set(month, {
+          key: month,
+          monthNum: parseInt(match[2]),
+          sortKey: `${match[1]}-${match[2].padStart(2, "0")}`,
+          label: month,
+          events: monthEvents,
+          referenceEvents: [],
+        });
+      }
+    }
+
+    for (const [monthKey, refEvents] of lastYearReferenceByMonth) {
+      if (sections.has(monthKey)) {
+        sections.get(monthKey)!.referenceEvents = refEvents;
+      } else {
+        const match = monthKey.match(/(\d{4})年(\d+)月/);
+        if (match) {
+          sections.set(monthKey, {
+            key: monthKey,
+            monthNum: parseInt(match[2]),
+            sortKey: `${match[1]}-${match[2].padStart(2, "0")}`,
+            label: monthKey,
+            events: [],
+            referenceEvents: refEvents,
+          });
+        }
+      }
+    }
+
+    return Array.from(sections.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  }, [eventsByMonth, lastYearReferenceByMonth]);
+
   return (
     <div className={styles.cardListFade}>
       {error && <div className={styles.error}>{error}</div>}
@@ -643,15 +734,28 @@ export function EventList() {
       }
 
       {
-        Object.entries(eventsByMonth).map(([month, monthEvents]) => {
-          const monthNum = month.replace(/[^0-9]/g, "").slice(-2);
+        allSections.map((section) => {
+          const hasCurrentEvents = section.events.length > 0;
+          const hasRefEvents = section.referenceEvents.length > 0;
+          const isReferenceOnly = !hasCurrentEvents && hasRefEvents;
+
           return (
-            <section key={month} className={styles.monthSection}>
-              <div className={styles.monthHeader}>
-                <div className={styles.monthNumber}>{parseInt(monthNum)}</div>
-                <span className={styles.monthLabel}>{month}</span>
+            <section key={section.key} className={styles.monthSection}>
+              <div className={isReferenceOnly ? styles.monthHeaderReference : styles.monthHeader}>
+                <div className={isReferenceOnly ? styles.monthNumberReference : styles.monthNumber}>
+                  {section.monthNum}
+                </div>
+                <div>
+                  <span className={styles.monthLabel}>
+                    {isReferenceOnly ? `${section.monthNum}月の大会（昨年実績）` : section.label}
+                  </span>
+                  {isReferenceOnly && (
+                    <div className={styles.monthSubLabel}>昨年の同時期に開催された大会です</div>
+                  )}
+                </div>
               </div>
-              {monthEvents.map((event) => (
+
+              {section.events.map((event) => (
                 <EventCard
                   key={event.id}
                   event={event}
@@ -660,6 +764,23 @@ export function EventList() {
                   normalizeGrade={normalizeGradeCategory}
                   enteredEventIds={enteredEventIds}
                   historicalDisciplines={historicalDisciplinesMap.get(event.id)}
+                />
+              ))}
+
+              {hasCurrentEvents && hasRefEvents && (
+                <div className={styles.referenceSubHeader}>
+                  <span className={styles.referenceSubTitle}>昨年の{section.monthNum}月の大会</span>
+                  <span className={styles.referenceSubText}>今年はまだ登録されていない大会です</span>
+                </div>
+              )}
+
+              {hasRefEvents && section.referenceEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  isLastYearReference
+                  normalizeGrade={normalizeGradeCategory}
+                  enteredEventIds={enteredEventIds}
                 />
               ))}
             </section>

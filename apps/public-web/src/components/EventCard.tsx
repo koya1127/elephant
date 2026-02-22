@@ -15,6 +15,8 @@ interface EventCardProps {
   enteredEventIds?: Set<string>;
   /** 過去大会から取得した参考種目 */
   historicalDisciplines?: Discipline[] | null;
+  /** 昨年実績として表示するか */
+  isLastYearReference?: boolean;
 }
 
 const DOW = ["日", "月", "火", "水", "木", "金", "土"] as const;
@@ -26,6 +28,7 @@ export function EventCard({
   normalizeGrade,
   enteredEventIds,
   historicalDisciplines,
+  isLastYearReference,
 }: EventCardProps) {
   const [showAllTags, setShowAllTags] = useState(false);
   const { month, day, dow } = parseDate(event.date);
@@ -41,10 +44,10 @@ export function EventCard({
   };
 
   return (
-    <article className={styles.card}>
+    <article className={isLastYearReference ? styles.cardReference : styles.card}>
       <div className={styles.cardHeader}>
         {/* 日付ブロック */}
-        <div className={styles.dateBlock}>
+        <div className={isLastYearReference ? styles.dateBlockReference : styles.dateBlock}>
           <span className={styles.dateMonth}>{month}月</span>
           <span className={styles.dateDay}>{day}{dateRange && <span style={{ fontSize: "14px", fontWeight: 500 }}>{dateRange}</span>}</span>
           {dow !== null && <span className={styles.dateDow}>{DOW[dow]}</span>}
@@ -55,7 +58,8 @@ export function EventCard({
           <div className={styles.infoMain}>
             <div className={styles.eventName}>
               {event.name}
-              {isEntered && <span className={styles.enteredBadge}>エントリー済み</span>}
+              {isLastYearReference && <span className={styles.lastYearBadge}>昨年実績</span>}
+              {!isLastYearReference && isEntered && <span className={styles.enteredBadge}>エントリー済み</span>}
             </div>
             <div className={styles.meta}>
               {event.location && (
@@ -90,29 +94,31 @@ export function EventCard({
             </div>
           </div>
 
-          <div className={styles.actions}>
-            {isEntered ? (
-              <span className={styles.enteredLabel}>エントリー済み</span>
-            ) : (
-              <EntryButton
-                eventName={event.name}
-                eventId={event.id}
-                eventDate={event.date}
-                disciplines={event.disciplines}
-                fee={event.fee}
-              />
-            )}
-            {event.detailUrl && (
-              <a
-                href={event.detailUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.detailLink}
-              >
-                要項PDF &rarr;
-              </a>
-            )}
-          </div>
+          {!isLastYearReference && (
+            <div className={styles.actions}>
+              {isEntered ? (
+                <span className={styles.enteredLabel}>エントリー済み</span>
+              ) : (
+                <EntryButton
+                  eventName={event.name}
+                  eventId={event.id}
+                  eventDate={event.date}
+                  disciplines={event.disciplines}
+                  fee={event.fee}
+                />
+              )}
+              {event.detailUrl && (
+                <a
+                  href={event.detailUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.detailLink}
+                >
+                  要項PDF &rarr;
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
