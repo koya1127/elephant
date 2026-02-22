@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { scrapeEvents, downloadPdf } from "@/lib/scraper";
 import { parsePdfWithClaude, parseExcelWithClaude } from "@/lib/pdfParser";
 import { siteConfigs } from "@/config/sites";
-import { readEvents, writeEvents } from "@/lib/storage";
+import { readEvents, writeEvents, cleanupOrphanEvents } from "@/lib/storage";
 import { checkAdmin } from "@/lib/admin";
 import { generateId, extractLocationFromName, deduplicateCrossSite } from "@/lib/event-utils";
 import type { Event, ScrapedEventRaw, ScrapeResult } from "@/lib/types";
@@ -205,6 +205,20 @@ export async function POST(request: Request) {
     }
 
     await writeEvents(existing);
+
+    // IDが変わった古いイベントを削除（名前修正で新IDが生成された場合のorphan cleanup）
+    for (const result of allResults) {
+      if (result.events.length === 0) continue;
+      const currentIds = result.events.map((e) => e.id);
+      try {
+        const deleted = await cleanupOrphanEvents(result.sourceId, currentIds);
+        if (deleted > 0) {
+          console.log(`[Cleanup] ${result.sourceId}: removed ${deleted} orphan events`);
+        }
+      } catch (e) {
+        console.error(`[Cleanup] ${result.sourceId}: error`, e);
+      }
+    }
 
     const totalEvents = allResults.reduce(
       (sum, r) => sum + r.events.length,
