@@ -180,12 +180,12 @@ export async function parseEventsFromHtml(
         // 月の最初の行
         currentMonth = $(tds[0]).text().trim();
         day = $(tds[1]).text().trim();
-        name = $(tds[3]).text().trim();
+        name = $(tds[3]).text().trim().replace(/\s+/g, " ");
         pdfLink = $(tds[4]).find("a").attr("href");
       } else {
         // 同月の続き行
         day = $(tds[0]).text().trim();
-        name = $(tds[2]).text().trim();
+        name = $(tds[2]).text().trim().replace(/\s+/g, " ");
         pdfLink = $(tds[3]).find("a").attr("href");
       }
       month = currentMonth;
@@ -228,7 +228,7 @@ export async function parseEventsFromHtml(
 
       // 日付は<th>に入っている
       const dateText = ths.length > 0 ? $(ths[0]).text().trim() : "";
-      const name = $(tds[0]).text().trim();
+      const name = $(tds[0]).text().trim().replace(/\s+/g, " ");
       const pdfLink = tds.length > 1
         ? $(tds[1]).find("a").attr("href") || $(tds[2]).find("a").attr("href")
         : undefined;
@@ -405,16 +405,21 @@ export async function parseEventsFromHtml(
       });
     });
   } else if (config.parser === "gakuren") {
-    // 学連: Google Sites Classic — テキスト＋リンクから正規表現で抽出
-    // ページ全体のテキストから「M/D(曜) 大会名 @会場」パターンを検索
-    const text = $.text();
-    // パターン: "5/3(土) 2025年度北海道学連競技会第1戦 @円山公園陸上競技場"
-    const lines = text.split(/\n/);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      // "M/D(曜)" or "M/D(曜)～D(曜)" のパターン
+    // 学連: Google Sites — <p>要素ごとにテキストを取得して正規表現で抽出
+    // ※ $.text()だと全テキストが改行なしで結合され1件しか取れない
+    // パターン: "5/3(土) 2025年度北海道学連競技会第1戦 ＠円山公園陸上競技場"
+    const candidates: string[] = [];
+    $("p").each((_, el) => {
+      const text = $(el).text().trim().replace(/\s+/g, " ");
+      if (text && text.match(/\d{1,2}\/\d{1,2}\([日月火水木金土]\)/)) {
+        candidates.push(text);
+      }
+    });
+    for (const trimmed of candidates) {
+      // "M/D(曜)" or "M/D(曜)～M/D(曜)" or "M/D(曜)～D(曜)" のパターン
+      // \s* で日付直後にスペースなしのケースにも対応
       const match = trimmed.match(
-        /(\d{1,2})\/(\d{1,2})\([日月火水木金土]\)(?:\s*[～~]\s*(\d{1,2})\/(\d{1,2})\([日月火水木金土]\))?\s+(.+?)(?:\s+@(.+))?$/
+        /(\d{1,2})\/(\d{1,2})\([日月火水木金土]\)(?:\s*[～~]\s*(?:(\d{1,2})\/)?(\d{1,2})\([日月火水木金土]\))?\s*(.+?)(?:\s+[＠@](.+))?$/
       );
       if (match) {
         const month = match[1].padStart(2, "0");
@@ -422,7 +427,9 @@ export async function parseEventsFromHtml(
         const endMonth = match[3] ? match[3].padStart(2, "0") : null;
         const endDay = match[4] ? match[4].padStart(2, "0") : null;
         const name = match[5].trim();
-        const location = match[6] ? match[6].trim() : "";
+        // location部分から「エントリー期間」「大会ページ」以降のゴミを除去
+        let location = match[6] ? match[6].trim() : "";
+        location = location.replace(/(エントリー|大会ページ).*$/, "").trim();
 
         const dateStr = endDay
           ? `${year}-${month}-${day}~${year}-${endMonth || month}-${endDay}`
@@ -1017,6 +1024,10 @@ async function parseMasters(
 
         // 大会名に関連するキーワードがあるかチェック
         if (!text.match(/大会|記録会|選手権|競技会/)) return;
+
+        // プログラム告知・要項アップ通知はスキップ（大会情報ではない）
+        if (text.match(/プログラムです[。！!]?$|プログラム抜粋|にて.*実施します/)) return;
+
         const month = dateInTitle[1].padStart(2, "0");
         const day = dateInTitle[2].padStart(2, "0");
 
@@ -1026,16 +1037,23 @@ async function parseMasters(
           ? new URL(newsLink, config.baseUrl).toString()
           : config.url;
 
-        // 大会名を抽出（日付部分を除去）
+        // 大会名を抽出（日付部分・ゴミを除去）
         let name = text
           .replace(/(\d+)月(\d+)日[（(][日月火水木金土・祝]+[）)]\s*開催\s*/, "")
           .replace(/要[項綱].*$/, "")
           .replace(/をアップ.*$/, "")
+          .replace(/の要項$/, "")
+          .replace(/^！/, "")
+          .replace(/の$/, "")
           .trim();
         if (!name) name = text;
 
-        // 重複チェック
-        const exists = events.some(e => e.dateText === `${year}-${month}-${day}` && e.name.includes(name.substring(0, 5)));
+        // 重複チェック（正規化して比較）
+        const nameNorm = name.replace(/\s+/g, "").replace(/第\d+回/, "");
+        const exists = events.some(e => {
+          const eNorm = e.name.replace(/\s+/g, "").replace(/第\d+回/, "");
+          return e.dateText === `${year}-${month}-${day}` || nameNorm.includes(eNorm.substring(0, 6)) || eNorm.includes(nameNorm.substring(0, 6));
+        });
         if (!exists) {
           events.push({
             name,
