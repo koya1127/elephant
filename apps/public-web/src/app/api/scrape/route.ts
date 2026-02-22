@@ -88,6 +88,9 @@ export async function POST(request: Request) {
           if (prev.note) events[i].note = prev.note;
           if (prev.pdfSize != null) events[i].pdfSize = prev.pdfSize;
           if (prev.location && !events[i].location) events[i].location = prev.location;
+          if (prev.fee != null) events[i].fee = prev.fee;
+          if (prev.actualFee != null) events[i].actualFee = prev.actualFee;
+          if (prev.feeSource) events[i].feeSource = prev.feeSource;
         }
       }
 
@@ -149,6 +152,9 @@ export async function POST(request: Request) {
                 events[val.index].pdfSize = prev.pdfSize;
                 if (prev.location)
                   events[val.index].location = prev.location;
+                if (prev.fee != null) events[val.index].fee = prev.fee;
+                if (prev.actualFee != null) events[val.index].actualFee = prev.actualFee;
+                if (prev.feeSource) events[val.index].feeSource = prev.feeSource;
                 skippedPdfs++;
               } else {
                 const { index, parsed, pdfSize } = val;
@@ -160,6 +166,11 @@ export async function POST(request: Request) {
                 events[index].entryDeadline = parsed.entryDeadline;
                 events[index].note = parsed.note;
                 events[index].pdfSize = pdfSize;
+                // fee: manual設定済みならPDF値で上書きしない
+                if (events[index].feeSource !== "manual" && parsed.fee != null) {
+                  events[index].fee = parsed.fee;
+                  events[index].feeSource = "pdf";
+                }
               }
             } else {
               console.error(`[PDF] Error:`, result.reason);

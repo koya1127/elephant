@@ -43,6 +43,12 @@ export interface Event {
   note?: string;
   /** PDFファイルサイズ（バイト数、差分解析用） */
   pdfSize?: number;
+  /** 参加費（JPY） */
+  fee?: number;
+  /** 実績費用（大会後に管理者入力） */
+  actualFee?: number;
+  /** 参加費のソース: 'pdf' | 'manual' */
+  feeSource?: string;
 }
 
 /** エントリー情報 */

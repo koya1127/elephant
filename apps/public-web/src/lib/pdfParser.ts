@@ -12,6 +12,7 @@ const PARSE_PROMPT = `この大会要項PDFから以下の情報をJSON形式で
   - note: 備考（あれば）
 - maxEntries: 1人あたりのエントリー可能種目数（記載があれば）
 - entryDeadline: エントリー締切日（YYYY-MM-DD形式、記載があれば）
+- fee: 参加費（1人あたり、数値のみ、円単位。一般の金額。記載なければnull）
 - note: その他備考
 
 JSON形式のみで回答してください。マークダウンのコードブロックは不要です。`;
@@ -21,6 +22,7 @@ interface PdfParseResult {
   disciplines: Discipline[];
   maxEntries?: number;
   entryDeadline?: string;
+  fee?: number;
   note?: string;
 }
 
@@ -97,6 +99,7 @@ export function normalizePdfResult(raw: Record<string, unknown>): PdfParseResult
     disciplines: normalizeDisciplines(raw.disciplines),
     maxEntries: normalizeMaxEntries(raw.maxEntries),
     entryDeadline: normalizeString(raw.entryDeadline),
+    fee: normalizeFee(raw.fee),
     note: normalizeString(raw.note),
   };
 }
@@ -134,6 +137,19 @@ export function normalizeMaxEntries(val: unknown): number | undefined {
     return typeof (val as Record<string, unknown>).individual === "number"
       ? (val as Record<string, number>).individual
       : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * 参加費を数値に正規化する（"3,000" → 3000, "3000円" → 3000）
+ */
+export function normalizeFee(val: unknown): number | undefined {
+  if (typeof val === "number") return val > 0 ? val : undefined;
+  if (typeof val === "string") {
+    const cleaned = val.replace(/[,，円¥\s]/g, "");
+    const num = parseInt(cleaned, 10);
+    return !isNaN(num) && num > 0 ? num : undefined;
   }
   return undefined;
 }

@@ -3,6 +3,7 @@ import {
   normalizeDisciplines,
   normalizeMaxEntries,
   normalizeString,
+  normalizeFee,
   normalizePdfResult,
 } from "@/lib/pdfParser";
 
@@ -122,6 +123,47 @@ describe("normalizeString", () => {
 });
 
 // ---------------------------------------------------------------------------
+// normalizeFee
+// ---------------------------------------------------------------------------
+describe("normalizeFee", () => {
+  it("数値はそのまま返す", () => {
+    expect(normalizeFee(3000)).toBe(3000);
+  });
+
+  it("カンマ区切り文字列を変換する", () => {
+    expect(normalizeFee("3,000")).toBe(3000);
+  });
+
+  it("円付き文字列を変換する", () => {
+    expect(normalizeFee("3000円")).toBe(3000);
+  });
+
+  it("カンマ+円付き文字列を変換する", () => {
+    expect(normalizeFee("3,000円")).toBe(3000);
+  });
+
+  it("0はundefined", () => {
+    expect(normalizeFee(0)).toBeUndefined();
+  });
+
+  it("負の数はundefined", () => {
+    expect(normalizeFee(-100)).toBeUndefined();
+  });
+
+  it("nullはundefined", () => {
+    expect(normalizeFee(null)).toBeUndefined();
+  });
+
+  it("undefinedはundefined", () => {
+    expect(normalizeFee(undefined)).toBeUndefined();
+  });
+
+  it("非数値文字列はundefined", () => {
+    expect(normalizeFee("無料")).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // normalizePdfResult
 // ---------------------------------------------------------------------------
 describe("normalizePdfResult", () => {
@@ -131,6 +173,7 @@ describe("normalizePdfResult", () => {
       disciplines: [{ name: "100m", grades: ["一般"] }],
       maxEntries: 3,
       entryDeadline: "2025-04-01",
+      fee: 3000,
       note: "雨天決行",
     };
     const result = normalizePdfResult(raw);
@@ -138,7 +181,20 @@ describe("normalizePdfResult", () => {
     expect(result.disciplines).toHaveLength(1);
     expect(result.maxEntries).toBe(3);
     expect(result.entryDeadline).toBe("2025-04-01");
+    expect(result.fee).toBe(3000);
     expect(result.note).toBe("雨天決行");
+  });
+
+  it("feeがカンマ区切り文字列でも数値に変換される", () => {
+    const raw = { location: "", disciplines: [], fee: "3,500" };
+    const result = normalizePdfResult(raw);
+    expect(result.fee).toBe(3500);
+  });
+
+  it("feeがnullの場合はundefined", () => {
+    const raw = { location: "", disciplines: [], fee: null };
+    const result = normalizePdfResult(raw);
+    expect(result.fee).toBeUndefined();
   });
 
   it("disciplinesがオブジェクト形式でもフラット化される", () => {

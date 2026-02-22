@@ -47,6 +47,9 @@ export async function writeEvents(data: ScrapeResult[]): Promise<void> {
               entryDeadline: event.entryDeadline ?? null,
               note: event.note ?? null,
               pdfSize: event.pdfSize ?? null,
+              fee: event.fee ?? null,
+              actualFee: event.actualFee ?? null,
+              feeSource: event.feeSource ?? null,
               scrapedAt: new Date(result.scrapedAt),
               updatedAt: new Date(),
             },
@@ -79,6 +82,9 @@ function toDbRow(event: Event, result: ScrapeResult) {
     entryDeadline: event.entryDeadline ?? null,
     note: event.note ?? null,
     pdfSize: event.pdfSize ?? null,
+    fee: event.fee ?? null,
+    actualFee: event.actualFee ?? null,
+    feeSource: event.feeSource ?? null,
     scrapedAt: new Date(result.scrapedAt),
     updatedAt: new Date(),
   };
@@ -100,6 +106,9 @@ function rowToEvent(row: EventRow): Event {
     entryDeadline: row.entryDeadline ?? undefined,
     note: row.note ?? undefined,
     pdfSize: row.pdfSize ?? undefined,
+    fee: row.fee ?? undefined,
+    actualFee: row.actualFee ?? undefined,
+    feeSource: row.feeSource ?? undefined,
   };
 }
 

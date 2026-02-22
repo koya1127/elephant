@@ -33,6 +33,9 @@ export interface Event {
   entryDeadline?: string;
   note?: string;
   pdfSize?: number;
+  fee?: number;
+  actualFee?: number;
+  feeSource?: string;
 }
 
 export interface ScrapeResult {
@@ -106,6 +109,9 @@ export async function readEventsForSource(sourceId: string): Promise<Event[]> {
     entryDeadline: row.entryDeadline ?? undefined,
     note: row.note ?? undefined,
     pdfSize: row.pdfSize ?? undefined,
+    fee: row.fee ?? undefined,
+    actualFee: row.actualFee ?? undefined,
+    feeSource: row.feeSource ?? undefined,
   }));
 }
 
@@ -135,6 +141,9 @@ export async function upsertEventsToDb(
           entryDeadline: event.entryDeadline ?? null,
           note: event.note ?? null,
           pdfSize: event.pdfSize ?? null,
+          fee: event.fee ?? null,
+          actualFee: event.actualFee ?? null,
+          feeSource: event.feeSource ?? null,
           scrapedAt: new Date(scrapedAt),
           updatedAt: new Date(),
         })
@@ -151,6 +160,9 @@ export async function upsertEventsToDb(
             entryDeadline: event.entryDeadline ?? null,
             note: event.note ?? null,
             pdfSize: event.pdfSize ?? null,
+            fee: event.fee ?? null,
+            actualFee: event.actualFee ?? null,
+            feeSource: event.feeSource ?? null,
             scrapedAt: new Date(scrapedAt),
             updatedAt: new Date(),
           },
