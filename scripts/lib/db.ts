@@ -12,37 +12,9 @@ import postgres from "postgres";
 import { events } from "../../apps/public-web/src/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-// --- Types (apps/public-web/src/lib/types.ts と同じ) ---
-
-export interface Discipline {
-  name: string;
-  grades: string[];
-  note?: string;
-}
-
-export interface Event {
-  id: string;
-  name: string;
-  date: string;
-  dateEnd?: string;
-  location: string;
-  disciplines: Discipline[];
-  maxEntries?: number;
-  detailUrl: string;
-  sourceId: string;
-  entryDeadline?: string;
-  note?: string;
-  pdfSize?: number;
-  fee?: number;
-  actualFee?: number;
-  feeSource?: string;
-}
-
-export interface ScrapeResult {
-  sourceId: string;
-  scrapedAt: string;
-  events: Event[];
-}
+// --- Types ---
+import type { Discipline, Event, ScrapeResult } from "../../apps/public-web/src/lib/types";
+export type { Discipline, Event, ScrapeResult };
 
 // --- Env loading ---
 
