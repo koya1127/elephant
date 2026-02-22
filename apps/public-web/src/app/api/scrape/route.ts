@@ -12,6 +12,29 @@ export const maxDuration = 300; // 5分
 
 const PDF_CONCURRENCY = 3; // 同時にPDF解析するリクエスト数
 
+/** 既存 or PDF解析結果からフィールドを引き継ぐ */
+function inheritPdfFields(
+  target: Event,
+  source: Partial<Pick<Event, 'disciplines' | 'maxEntries' | 'entryDeadline' | 'note' | 'pdfSize' | 'location' | 'fee' | 'actualFee' | 'feeSource'>>,
+  options?: { preserveManualFee?: boolean }
+): void {
+  if (source.disciplines && source.disciplines.length > 0) target.disciplines = source.disciplines;
+  if (source.maxEntries != null) target.maxEntries = source.maxEntries;
+  if (source.entryDeadline) target.entryDeadline = source.entryDeadline;
+  if (source.note) target.note = source.note;
+  if (source.pdfSize != null) target.pdfSize = source.pdfSize;
+  if (source.location && !target.location) target.location = source.location;
+  if (source.fee != null) {
+    if (!options?.preserveManualFee || target.feeSource !== "manual") {
+      target.fee = source.fee;
+    }
+  }
+  if (source.actualFee != null) target.actualFee = source.actualFee;
+  if (source.feeSource && (!options?.preserveManualFee || target.feeSource !== "manual")) {
+    target.feeSource = source.feeSource;
+  }
+}
+
 /**
  * POST /api/scrape
  * スクレイピングを実行してevents.jsonに保存する
@@ -81,17 +104,7 @@ export async function POST(request: Request) {
       // skipPdf時 or PDFなしイベント: 既存のPDF解析結果を引き継ぐ
       for (let i = 0; i < events.length; i++) {
         const prev = existingMap.get(events[i].id);
-        if (prev) {
-          if (prev.disciplines.length > 0) events[i].disciplines = prev.disciplines;
-          if (prev.maxEntries != null) events[i].maxEntries = prev.maxEntries;
-          if (prev.entryDeadline) events[i].entryDeadline = prev.entryDeadline;
-          if (prev.note) events[i].note = prev.note;
-          if (prev.pdfSize != null) events[i].pdfSize = prev.pdfSize;
-          if (prev.location && !events[i].location) events[i].location = prev.location;
-          if (prev.fee != null) events[i].fee = prev.fee;
-          if (prev.actualFee != null) events[i].actualFee = prev.actualFee;
-          if (prev.feeSource) events[i].feeSource = prev.feeSource;
-        }
+        if (prev) inheritPdfFields(events[i], prev);
       }
 
       // 要項解析（PDF/Excel対応、並列バッチ処理、差分解析付き）
@@ -143,33 +156,20 @@ export async function POST(request: Request) {
             if (result.status === "fulfilled") {
               const val = result.value;
               if (val.skipped) {
-                // 前回の解析結果をコピー
-                const { prev } = val;
-                events[val.index].disciplines = prev.disciplines;
-                events[val.index].maxEntries = prev.maxEntries;
-                events[val.index].entryDeadline = prev.entryDeadline;
-                events[val.index].note = prev.note;
-                events[val.index].pdfSize = prev.pdfSize;
-                if (prev.location)
-                  events[val.index].location = prev.location;
-                if (prev.fee != null) events[val.index].fee = prev.fee;
-                if (prev.actualFee != null) events[val.index].actualFee = prev.actualFee;
-                if (prev.feeSource) events[val.index].feeSource = prev.feeSource;
+                inheritPdfFields(events[val.index], val.prev);
                 skippedPdfs++;
               } else {
                 const { index, parsed, pdfSize } = val;
-                if (parsed.location)
-                  events[index].location = parsed.location;
-                events[index].disciplines =
-                  parsed.disciplines || [];
-                events[index].maxEntries = parsed.maxEntries;
-                events[index].entryDeadline = parsed.entryDeadline;
-                events[index].note = parsed.note;
-                events[index].pdfSize = pdfSize;
-                // fee: manual設定済みならPDF値で上書きしない
-                if (events[index].feeSource !== "manual" && parsed.fee != null) {
-                  events[index].fee = parsed.fee;
-                  events[index].feeSource = "pdf";
+                const ev = events[index];
+                if (parsed.location) ev.location = parsed.location;
+                ev.disciplines = parsed.disciplines || [];
+                ev.maxEntries = parsed.maxEntries;
+                ev.entryDeadline = parsed.entryDeadline;
+                ev.note = parsed.note;
+                ev.pdfSize = pdfSize;
+                if (ev.feeSource !== "manual" && parsed.fee != null) {
+                  ev.fee = parsed.fee;
+                  ev.feeSource = "pdf";
                 }
               }
             } else {
