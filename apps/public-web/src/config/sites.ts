@@ -10,6 +10,7 @@ const REIWA = YEAR - 2018; // 令和: 2025→r7, 2026→r8
 export const sorachiConfig: SiteConfig = {
   id: "sorachi",
   name: "空知陸上競技協会",
+  label: { short: "空知", region: "空知地方" },
   url: `https://sorachi-rikkyo.com/event/${YEAR}/requirements.html`,
   baseUrl: `https://sorachi-rikkyo.com/event/${YEAR}/`,
   encoding: "shift_jis",
@@ -29,6 +30,7 @@ export const sorachiConfig: SiteConfig = {
 export const kushiroConfig: SiteConfig = {
   id: "kushiro",
   name: "釧路地方陸上競技協会",
+  label: { short: "釧路", region: "釧路・根室" },
   url: `https://kushirorikujo.com/r${REIWA}competitionschedule.html`,
   baseUrl: "https://kushirorikujo.com/",
   parser: "kushiro",
@@ -48,6 +50,7 @@ export const kushiroConfig: SiteConfig = {
 export const douoConfig: SiteConfig = {
   id: "douo",
   name: "道央陸上競技協会",
+  label: { short: "道央", region: "道央" },
   url: "https://www.douo-tandf.com/%E7%AB%B6%E6%8A%80%E4%BC%9A%E6%83%85%E5%A0%B1/",
   baseUrl: "https://www.douo-tandf.com/",
   parser: "douo",
@@ -68,6 +71,7 @@ export const douoConfig: SiteConfig = {
 export const sapporoConfig: SiteConfig = {
   id: "sapporo",
   name: "札幌陸上競技協会",
+  label: { short: "札幌", region: "札幌市" },
   url: "https://jaaf-sapporo.jp/schedule/index.html",
   baseUrl: "https://jaaf-sapporo.jp/",
   guidelineUrl: "https://jaaf-sapporo.jp/guideline/index.html",
@@ -86,6 +90,7 @@ export const sapporoConfig: SiteConfig = {
 export const hokkaidoConfig: SiteConfig = {
   id: "hokkaido",
   name: "北海道陸上競技協会",
+  label: { short: "北海道", region: "北海道全域" },
   url: "https://www.hokkaido-rikkyo.jp/information/index.html",
   scheduleUrl: "https://hokkaido-rikkyo.jp/schedule/index.html",
   baseUrl: "https://www.hokkaido-rikkyo.jp/",
@@ -104,6 +109,7 @@ export const hokkaidoConfig: SiteConfig = {
 export const tokachiConfig: SiteConfig = {
   id: "tokachi",
   name: "十勝陸上競技協会",
+  label: { short: "十勝", region: "十勝地方" },
   url: `https://tokachi-tf.sakura.ne.jp/${YEAR}/kako${YEAR}.html`,
   baseUrl: `https://tokachi-tf.sakura.ne.jp/${YEAR}/`,
   encoding: "shift_jis",
@@ -123,6 +129,7 @@ export const tokachiConfig: SiteConfig = {
 export const chuutairenConfig: SiteConfig = {
   id: "chuutairen",
   name: "北海道中学体育連盟",
+  label: { short: "中体連", region: "北海道中学" },
   url: "https://hokkaido-rikkyo.jp/do/games.html",
   baseUrl: "https://hokkaido-rikkyo.jp/do/",
   encoding: "shift_jis",
@@ -142,6 +149,7 @@ export const chuutairenConfig: SiteConfig = {
 export const koutairenConfig: SiteConfig = {
   id: "koutairen",
   name: "北海道高体連陸上競技専門部",
+  label: { short: "高体連", region: "北海道高校" },
   url: "https://www.doukoutairen-rikujyou.com/%E5%A4%A7%E4%BC%9A%E6%97%A5%E7%A8%8B/",
   baseUrl: "https://www.doukoutairen-rikujyou.com/",
   useCurl: true,
@@ -160,6 +168,7 @@ export const koutairenConfig: SiteConfig = {
 export const gakurenConfig: SiteConfig = {
   id: "gakuren",
   name: "北海道学生陸上競技連盟",
+  label: { short: "学連", region: "北海道大学" },
   url: "https://sites.google.com/site/hokkaidogakuren2016/%E7%AB%B6%E6%8A%80%E4%BC%9A%E6%83%85%E5%A0%B1",
   baseUrl: "https://sites.google.com/",
   parser: "gakuren",
@@ -177,6 +186,7 @@ export const gakurenConfig: SiteConfig = {
 export const mastersConfig: SiteConfig = {
   id: "masters",
   name: "北海道マスターズ陸上競技連盟",
+  label: { short: "マスターズ", region: "北海道" },
   url: "https://hokkaido-masters.jp/schedule.php",
   baseUrl: "https://hokkaido-masters.jp/",
   parser: "masters",
@@ -194,6 +204,7 @@ export const mastersConfig: SiteConfig = {
 export const runnetConfig: SiteConfig = {
   id: "runnet",
   name: "ランネット（北海道）",
+  label: { short: "ランネット", region: "ロードレース" },
   url: "https://runnet.jp/entry/runtes/user/pc/RaceSearchZZSDetailAction.do?command=search&prefectureIds=01",
   baseUrl: "https://runnet.jp/",
   parser: "runnet",
@@ -212,6 +223,7 @@ export const runnetConfig: SiteConfig = {
 export const tomakomaiConfig: SiteConfig = {
   id: "tomakomai",
   name: "苫小牧陸上競技協会",
+  label: { short: "苫小牧", region: "苫小牧市" },
   url: "https://tomakomairikkyo.jimdofree.com/%E7%AB%B6%E6%8A%80%E4%BC%9A%E7%AD%89%E6%83%85%E5%A0%B1/",
   baseUrl: "https://tomakomairikkyo.jimdofree.com/",
   useCurl: true,
@@ -230,6 +242,7 @@ export const tomakomaiConfig: SiteConfig = {
 export const dohokuConfig: SiteConfig = {
   id: "dohoku",
   name: "道北陸上競技協会",
+  label: { short: "道北", region: "旭川・道北" },
   url: "https://cf139878.cloudfree.jp/schedule/schedule.htm",
   baseUrl: "https://cf139878.cloudfree.jp/schedule/",
   guidelineUrl: "https://cf139878.cloudfree.jp/program/program.htm",
@@ -248,6 +261,7 @@ export const dohokuConfig: SiteConfig = {
 export const donanConfig: SiteConfig = {
   id: "donan",
   name: "道南陸上競技協会",
+  label: { short: "道南", region: "函館・道南" },
   url: "https://donan-rikkyo.jp/athletics/",
   baseUrl: "https://donan-rikkyo.jp/",
   parser: "donan",
@@ -265,6 +279,7 @@ export const donanConfig: SiteConfig = {
 export const osrkConfig: SiteConfig = {
   id: "osrk",
   name: "小樽後志陸上競技協会",
+  label: { short: "小樽後志", region: "小樽・後志" },
   url: "https://osrk.jp/%e7%ab%b6%e6%8a%80%e4%bc%9a%e6%83%85%e5%a0%b1/",
   baseUrl: "https://osrk.jp/",
   useCurl: true, // Vercel IPブロック対策: GitHub Actionsで定期スクレイプ
@@ -284,6 +299,7 @@ export const osrkConfig: SiteConfig = {
 export const murorikaConfig: SiteConfig = {
   id: "muroriku",
   name: "室蘭地方陸上競技協会",
+  label: { short: "室蘭", region: "室蘭・西胆振" },
   url: "https://muroriku243443.wixsite.com/muroriku/timetable",
   baseUrl: "https://muroriku243443.wixsite.com/muroriku/",
   useCurl: true,
@@ -302,6 +318,7 @@ export const murorikaConfig: SiteConfig = {
 export const orkConfig: SiteConfig = {
   id: "ork",
   name: "オホーツク陸上競技協会",
+  label: { short: "オホーツク", region: "北見・オホーツク" },
   url: "https://www.h-ork.jp/tournament_schedule",
   baseUrl: "https://www.h-ork.jp/",
   parser: "ork",
@@ -332,3 +349,8 @@ export const siteConfigs: SiteConfig[] = [
   murorikaConfig,
   orkConfig,
 ];
+
+/** sourceId → UI表示ラベル（siteConfigs から自動生成） */
+export const SOURCE_LABELS: Record<string, { short: string; region: string }> = Object.fromEntries(
+  siteConfigs.map((c) => [c.id, c.label])
+);

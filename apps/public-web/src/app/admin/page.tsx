@@ -3,28 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
 import type { Entry } from "@/lib/types";
+import { SOURCE_LABELS } from "@/config/sites";
 import styles from "./page.module.css";
-
-/** sourceId → 表示名マッピング */
-const SOURCE_LABELS: Record<string, { short: string; region: string }> = {
-  sorachi: { short: "空知", region: "空知地方" },
-  kushiro: { short: "釧路", region: "釧路・根室" },
-  douo: { short: "道央", region: "道央" },
-  sapporo: { short: "札幌", region: "札幌市" },
-  hokkaido: { short: "北海道", region: "北海道全域" },
-  tokachi: { short: "十勝", region: "十勝地方" },
-  chuutairen: { short: "中体連", region: "北海道中学" },
-  koutairen: { short: "高体連", region: "北海道高校" },
-  gakuren: { short: "学連", region: "北海道大学" },
-  masters: { short: "マスターズ", region: "北海道" },
-  runnet: { short: "ランネット", region: "ロードレース" },
-  tomakomai: { short: "苫小牧", region: "苫小牧市" },
-  dohoku: { short: "道北", region: "旭川・道北" },
-  donan: { short: "道南", region: "函館・道南" },
-  osrk: { short: "小樽後志", region: "小樽・後志" },
-  muroriku: { short: "室蘭", region: "室蘭・西胆振" },
-  ork: { short: "オホーツク", region: "北見・オホーツク" },
-};
 
 type Tab = "entries" | "members" | "scrape" | "fees";
 
