@@ -28,7 +28,6 @@ const SOURCE_LABELS: Record<string, { short: string; region: string }> = {
   koutairen: { short: "高体連", region: "北海道高校" },
   gakuren: { short: "学連", region: "北海道大学" },
   masters: { short: "マスターズ", region: "北海道" },
-  runnet: { short: "ランネット", region: "ロードレース" },
   tomakomai: { short: "苫小牧", region: "苫小牧市" },
   dohoku: { short: "道北", region: "旭川・道北" },
   donan: { short: "道南", region: "函館・道南" },
@@ -286,6 +285,9 @@ export function EventList() {
         today.setHours(0, 0, 0, 0);
         if (eventDate < today) return false;
       }
+
+      // Exclude Runnet-only events (events not listed on any athletic association site)
+      if (event.sourceId === "runnet") return false;
 
       if (selectedSources.size > 0) {
         if (!selectedSources.has(event.sourceId)) return false;
