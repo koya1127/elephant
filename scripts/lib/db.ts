@@ -45,7 +45,7 @@ export interface ScrapeResult {
 
 export function loadEnv() {
   // .env.blob と .env.local を読み込み
-  for (const envFile of [".env.blob", ".env.local"]) {
+  for (const envFile of [".env.blob", ".env.local", "apps/public-web/.env.local"]) {
     try {
       const envPath = resolve(process.cwd(), envFile);
       const content = readFileSync(envPath, "utf-8");
