@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { addEntry, getUserEntries, checkDuplicate } from "@/lib/entry-storage";
 import type { Entry } from "@/lib/types";
 
@@ -15,6 +15,11 @@ export async function GET() {
   return NextResponse.json({ entries });
 }
 
+/**
+ * POST /api/entries
+ * 参加費未設定の大会への無料エントリー
+ * （参加費設定済みの場合は /api/stripe/entry-checkout を使用）
+ */
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
@@ -32,28 +37,6 @@ export async function POST(req: NextRequest) {
   if (!eventId || !eventName || !eventDate) {
     return NextResponse.json(
       { error: "eventId, eventName, eventDate は必須です" },
-      { status: 400 }
-    );
-  }
-
-  // Clerk metadata チェック
-  const clerk = await clerkClient();
-  const user = await clerk.users.getUser(userId);
-  const meta = user.publicMetadata as Record<string, unknown>;
-  const memberStatus = meta?.memberStatus as string | undefined;
-  const entryLimit = (meta?.entryLimit as number) || 0;
-  const entriesUsed = (meta?.entriesUsed as number) || 0;
-
-  if (memberStatus !== "active") {
-    return NextResponse.json(
-      { error: "会員ステータスがactiveではありません" },
-      { status: 400 }
-    );
-  }
-
-  if (entriesUsed >= entryLimit) {
-    return NextResponse.json(
-      { error: "エントリー上限に達しています" },
       { status: 400 }
     );
   }
@@ -81,17 +64,5 @@ export async function POST(req: NextRequest) {
 
   await addEntry(entry);
 
-  // entriesUsed を +1
-  const newEntriesUsed = entriesUsed + 1;
-  await clerk.users.updateUserMetadata(userId, {
-    publicMetadata: {
-      ...meta,
-      entriesUsed: newEntriesUsed,
-    },
-  });
-
-  return NextResponse.json({
-    entry,
-    remaining: entryLimit - newEntriesUsed,
-  });
+  return NextResponse.json({ entry });
 }

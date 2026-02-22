@@ -206,6 +206,64 @@
   text-align: center;
 }
 
+.feeExplainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feeItem {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.feeLabel {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.feeDesc {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.stepList {
+  list-style: none;
+  padding: 0;
+  counter-reset: step;
+}
+
+.stepList li {
+  counter-increment: step;
+  padding: 10px 0 10px 40px;
+  position: relative;
+  font-size: 14px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.stepList li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 28px;
+  height: 28px;
+  background: #f97316;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .loginPrompt {
   text-align: center;
   padding: 48px 20px;
