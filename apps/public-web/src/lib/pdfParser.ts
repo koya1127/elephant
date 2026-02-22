@@ -91,7 +91,7 @@ export async function parsePdfWithClaude(
  * - maxEntries がオブジェクト → 数値に変換
  * - entryDeadline がオブジェクト → 文字列に変換
  */
-function normalizePdfResult(raw: Record<string, unknown>): PdfParseResult {
+export function normalizePdfResult(raw: Record<string, unknown>): PdfParseResult {
   return {
     location: typeof raw.location === "string" ? raw.location : "",
     disciplines: normalizeDisciplines(raw.disciplines),
@@ -101,7 +101,7 @@ function normalizePdfResult(raw: Record<string, unknown>): PdfParseResult {
   };
 }
 
-function normalizeDisciplines(val: unknown): Discipline[] {
+export function normalizeDisciplines(val: unknown): Discipline[] {
   if (Array.isArray(val)) return val;
   if (val && typeof val === "object") {
     // {male: [...], female: [...]} → フラット配列にマージ
@@ -128,7 +128,7 @@ function normalizeDisciplines(val: unknown): Discipline[] {
   return [];
 }
 
-function normalizeMaxEntries(val: unknown): number | undefined {
+export function normalizeMaxEntries(val: unknown): number | undefined {
   if (typeof val === "number") return val;
   if (val && typeof val === "object" && "individual" in val) {
     return typeof (val as Record<string, unknown>).individual === "number"
@@ -138,7 +138,7 @@ function normalizeMaxEntries(val: unknown): number | undefined {
   return undefined;
 }
 
-function normalizeString(val: unknown): string | undefined {
+export function normalizeString(val: unknown): string | undefined {
   if (typeof val === "string") return val;
   if (val === null || val === undefined) return undefined;
   if (typeof val === "object") {

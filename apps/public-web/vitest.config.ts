@@ -8,7 +8,12 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      include: ["src/lib/scraper.ts"],
+      include: [
+        "src/lib/scraper.ts",
+        "src/lib/event-utils.ts",
+        "src/lib/event-helpers.ts",
+        "src/lib/pdfParser.ts",
+      ],
     },
   },
 });
