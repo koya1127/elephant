@@ -1241,6 +1241,44 @@ async function fetchDohokuYoukoPdfs(
 }
 
 /**
+ * 個別ページから要項PDFリンクを取得する共通ヘルパー（ork / donan 共通）
+ */
+async function fetchDetailPdfUrls(
+  events: ScrapedEventRaw[],
+  baseUrl: string,
+  fallbackUrl: string,
+  batchSize = 3
+): Promise<void> {
+  for (let i = 0; i < events.length; i += batchSize) {
+    const batch = events.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (ev) => {
+        if (!ev.detailUrl || ev.detailUrl === fallbackUrl) return;
+        try {
+          const dHtml = await fetchHtml(ev.detailUrl);
+          const $d = cheerio.load(dHtml);
+          $d("a").each((_, a) => {
+            if (ev.pdfUrl) return;
+            const href = $d(a).attr("href") || "";
+            const text = $d(a).text().trim();
+            if (
+              href.endsWith(".pdf") &&
+              (text.includes("要項") || text.includes("開催要項"))
+            ) {
+              ev.pdfUrl = href.startsWith("http")
+                ? href
+                : new URL(href, baseUrl).toString();
+            }
+          });
+        } catch {
+          // 詳細ページ取得失敗は無視
+        }
+      })
+    );
+  }
+}
+
+/**
  * オホーツク: HTMLテーブルから大会一覧取得 + 詳細ページから要項PDFリンク取得
  */
 async function parseOrk(
@@ -1293,35 +1331,7 @@ async function parseOrk(
     });
   });
 
-  // 個別ページから要項PDFリンクを取得（3件並列）
-  const BATCH = 3;
-  for (let i = 0; i < events.length; i += BATCH) {
-    const batch = events.slice(i, i + BATCH);
-    await Promise.all(
-      batch.map(async (ev) => {
-        if (!ev.detailUrl || ev.detailUrl === config.url) return;
-        try {
-          const dHtml = await fetchHtml(ev.detailUrl);
-          const $d = cheerio.load(dHtml);
-          $d("a").each((_, a) => {
-            if (ev.pdfUrl) return;
-            const href = $d(a).attr("href") || "";
-            const text = $d(a).text().trim();
-            if (
-              href.endsWith(".pdf") &&
-              (text.includes("要項") || text.includes("開催要項"))
-            ) {
-              ev.pdfUrl = href.startsWith("http")
-                ? href
-                : new URL(href, config.baseUrl).toString();
-            }
-          });
-        } catch {
-          // 詳細ページ取得失敗は無視
-        }
-      })
-    );
-  }
+  await fetchDetailPdfUrls(events, config.baseUrl, config.url);
 
   return events;
 }
@@ -1379,35 +1389,7 @@ async function parseDonan(
     parseListHtml(pageHtml);
   }
 
-  // 個別ページから要項PDFリンクを取得（3件並列）
-  const BATCH = 3;
-  for (let i = 0; i < events.length; i += BATCH) {
-    const batch = events.slice(i, i + BATCH);
-    await Promise.all(
-      batch.map(async (ev) => {
-        if (!ev.detailUrl || ev.detailUrl === config.url) return;
-        try {
-          const dHtml = await fetchHtml(ev.detailUrl);
-          const $d = cheerio.load(dHtml);
-          $d("a").each((_, a) => {
-            if (ev.pdfUrl) return;
-            const href = $d(a).attr("href") || "";
-            const text = $d(a).text().trim();
-            if (
-              href.endsWith(".pdf") &&
-              (text.includes("要項") || text.includes("開催要項"))
-            ) {
-              ev.pdfUrl = href.startsWith("http")
-                ? href
-                : new URL(href, config.baseUrl).toString();
-            }
-          });
-        } catch {
-          // 詳細ページ取得失敗は無視
-        }
-      })
-    );
-  }
+  await fetchDetailPdfUrls(events, config.baseUrl, config.url);
 
   return events;
 }
