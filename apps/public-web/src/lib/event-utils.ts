@@ -1,4 +1,5 @@
 import { siteConfigs } from "@/config/sites";
+import { toHalfWidthAll } from "./text-utils";
 import type { Discipline, Event, ScrapeResult } from "./types";
 
 export function generateId(name: string, date: string, sourceId: string): string {
@@ -14,14 +15,16 @@ export function extractLocationFromName(name: string): string {
   return match ? match[1] : "";
 }
 
+/** スペース除去 + 全角英数→半角 */
+function normalizeBase(name: string): string {
+  return toHalfWidthAll(name.replace(/[\s\u3000]+/g, ""));
+}
+
 /**
  * 名前正規化（スペース・全角英数を統一して比較しやすくする）
  */
 export function normalizeName(name: string): string {
-  return name
-    .replace(/[\s\u3000]+/g, "")
-    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
-    .replace(/[Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+  return normalizeBase(name)
     .replace(/^20\d{2}/, ""); // 先頭の年号を除去（「2025苫小牧記録会」→「苫小牧記録会」）
 }
 
@@ -29,10 +32,7 @@ export function normalizeName(name: string): string {
  * 過去大会マッチング用の正規化（回次・年度・兼以降を除去）
  */
 export function normalizeForHistoricalMatch(name: string): string {
-  return name
-    .replace(/[\s\u3000]+/g, "")
-    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
-    .replace(/[Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+  return normalizeBase(name)
     .replace(/20\d{2}年?/g, "")
     .replace(/第\d+回/g, "")
     .replace(/令和[一二三四五六七八九十\d]+年度?/g, "")
