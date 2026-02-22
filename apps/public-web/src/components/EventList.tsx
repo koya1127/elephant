@@ -267,6 +267,9 @@ export function EventList() {
         if (eventDate < today) return false;
       }
 
+      // Exclude Runnet-only events (events not listed on any athletic association site)
+      if (event.sourceId === "runnet") return false;
+
       if (selectedSources.size > 0) {
         if (!selectedSources.has(event.sourceId)) return false;
       }

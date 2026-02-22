@@ -8,6 +8,7 @@ import {
   serial,
   uniqueIndex,
   index,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 
 /** events テーブル */
@@ -61,6 +62,26 @@ export const entries = pgTable(
     uniqueIndex("idx_entries_user_event").on(table.userId, table.eventId),
     index("idx_entries_user_id").on(table.userId),
   ]
+);
+
+/** venues テーブル（競技場マップ） */
+export const venues = pgTable(
+  "venues",
+  {
+    id: text("id").primaryKey(),
+    type: text("type").notNull(), // "stadium" | "practice" | "powermax"
+    name: text("name").notNull(),
+    description: text("description"),
+    address: text("address"),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    keywords: jsonb("keywords").default([]),
+    url: text("url"),
+    userId: text("user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [index("idx_venues_type").on(table.type)]
 );
 
 /** health_checks テーブル */
