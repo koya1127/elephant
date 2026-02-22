@@ -354,3 +354,8 @@ export const siteConfigs: SiteConfig[] = [
 export const SOURCE_LABELS: Record<string, { short: string; region: string }> = Object.fromEntries(
   siteConfigs.map((c) => [c.id, c.label])
 );
+
+/** useCurl: true のサイトID一覧（Vercel非対応、専用スクリプト実行） */
+export const EXTERNAL_SITE_IDS = new Set(
+  siteConfigs.filter((c) => c.useCurl).map((c) => c.id)
+);

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
 import type { Entry } from "@/lib/types";
-import { SOURCE_LABELS } from "@/config/sites";
+import { SOURCE_LABELS, EXTERNAL_SITE_IDS } from "@/config/sites";
 import styles from "./page.module.css";
 
 type Tab = "entries" | "members" | "scrape" | "fees";
@@ -323,9 +323,8 @@ function ScrapeTab() {
   const handleScrapeAll = async (skipPdf: boolean) => {
     setScraping(true);
     setError(null);
-    const SKIP_SITES = ["douo", "koutairen", "tomakomai", "muroriku"];
     const sites = Object.keys(SOURCE_LABELS).filter(
-      (s) => !SKIP_SITES.includes(s)
+      (s) => !EXTERNAL_SITE_IDS.has(s)
     );
     for (const siteId of sites) {
       await handleScrapeSite(siteId, skipPdf);
@@ -431,7 +430,7 @@ function ScrapeTab() {
       {/* サイト別スクレイプ */}
       <div className={styles.siteGrid}>
         {Object.entries(SOURCE_LABELS).map(([siteId, info]) => {
-          const isExternal = siteId === "douo" || siteId === "koutairen" || siteId === "tomakomai" || siteId === "muroriku" || siteId === "osrk";
+          const isExternal = EXTERNAL_SITE_IDS.has(siteId);
           const status = scrapingSites[siteId];
           const isBusy = status === "HTML取得中" || status === "PDF解析中";
           return (
