@@ -1,7 +1,7 @@
 import type { ScrapeResult, Event, Discipline } from "./types";
 import { db } from "./db";
 import { events } from "./db/schema";
-import { eq, and, notInArray, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 /**
  * 保存済みの大会データを読み込む
@@ -57,34 +57,6 @@ export async function writeEvents(data: ScrapeResult[]): Promise<void> {
       }
     }
   });
-}
-
-/**
- * 特定 sourceId のイベントを DB から削除する（0件スクレイプ時の既存データ保持には使わない）
- */
-export async function deleteEventsBySourceId(sourceId: string): Promise<void> {
-  await db.delete(events).where(eq(events.sourceId, sourceId));
-}
-
-/**
- * スクレイプ後に、同じsourceIdで新しいデータに含まれない古いイベントを削除する
- * ただしエントリーが紐付いているイベントは削除しない（外部キー制約保護）
- */
-export async function cleanupOrphanEvents(
-  sourceId: string,
-  currentIds: string[]
-): Promise<number> {
-  if (currentIds.length === 0) return 0;
-  const result = await db
-    .delete(events)
-    .where(
-      and(
-        eq(events.sourceId, sourceId),
-        notInArray(events.id, currentIds),
-        sql`${events.id} NOT IN (SELECT event_id FROM entries)`
-      )
-    );
-  return (result as unknown as { count: number }).count ?? 0;
 }
 
 // --- DB row → Event 変換 ---
