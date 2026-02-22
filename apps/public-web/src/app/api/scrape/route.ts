@@ -77,6 +77,19 @@ export async function POST(request: Request) {
         };
       });
 
+      // skipPdf時 or PDFなしイベント: 既存のPDF解析結果を引き継ぐ
+      for (let i = 0; i < events.length; i++) {
+        const prev = existingMap.get(events[i].id);
+        if (prev) {
+          if (prev.disciplines.length > 0) events[i].disciplines = prev.disciplines;
+          if (prev.maxEntries != null) events[i].maxEntries = prev.maxEntries;
+          if (prev.entryDeadline) events[i].entryDeadline = prev.entryDeadline;
+          if (prev.note) events[i].note = prev.note;
+          if (prev.pdfSize != null) events[i].pdfSize = prev.pdfSize;
+          if (prev.location && !events[i].location) events[i].location = prev.location;
+        }
+      }
+
       // 要項解析（PDF/Excel対応、並列バッチ処理、差分解析付き）
       let skippedPdfs = 0;
       if (!skipPdf) {
