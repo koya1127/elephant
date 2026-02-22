@@ -257,7 +257,7 @@ describe("deduplicateCrossSite", () => {
     expect(existing[0].events).toHaveLength(0);
   });
 
-  it("同じsourceIdのイベントは重複除去しない", () => {
+  it("同じsourceIdでも重複イベントは除去する", () => {
     const results: ScrapeResult[] = [
       {
         sourceId: "sorachi",
@@ -269,7 +269,34 @@ describe("deduplicateCrossSite", () => {
       },
     ];
     deduplicateCrossSite(results, []);
-    expect(results[0].events).toHaveLength(2);
+    expect(results[0].events).toHaveLength(1);
+  });
+
+  it("同一ソースで微妙に名前が異なる重複を除去する（HTML vs PDF名）", () => {
+    const results: ScrapeResult[] = [
+      {
+        sourceId: "tokachi",
+        scrapedAt: "",
+        events: [
+          {
+            id: "t1", sourceId: "tokachi", date: "2025-04-19",
+            name: "第27回阿部重広杯長距離競技会兼 第26回競歩記録会兼 種目別記録会第１戦　帯広の森",
+            location: "帯広の森", disciplines: [], detailUrl: "",
+          },
+          {
+            id: "t2", sourceId: "tokachi", date: "2025-04-19",
+            name: "第27回阿部重広杯長距離競技大会 兼 第26回競歩記録会 兼 春季記録会第１戦　帯広の森",
+            location: "帯広の森陸上競技場",
+            disciplines: [{ name: "800m", grades: [] }, { name: "1500m", grades: [] }],
+            detailUrl: "", entryDeadline: "4/4",
+          },
+        ],
+      },
+    ];
+    deduplicateCrossSite(results, []);
+    // disciplines が多い方（t2）が残る
+    expect(results[0].events).toHaveLength(1);
+    expect(results[0].events[0].disciplines).toHaveLength(2);
   });
 
   it("日付が異なるイベントは重複除去しない", () => {

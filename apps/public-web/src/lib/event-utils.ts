@@ -58,13 +58,12 @@ export function deduplicateCrossSite(
 
   let totalRemoved = 0;
 
-  // 各日付グループ内で異なるsourceId間の重複を検出
+  // 各日付グループ内で重複を検出（同一ソース含む）
   for (const [, group] of byDate) {
     for (let i = 0; i < group.length; i++) {
       if (group[i].removed) continue;
       for (let j = i + 1; j < group.length; j++) {
         if (group[j].removed) continue;
-        if (group[i].event.sourceId === group[j].event.sourceId) continue;
 
         const a = group[i], b = group[j];
         if (!isDuplicate(a.event, b.event)) continue;
@@ -82,7 +81,7 @@ export function deduplicateCrossSite(
   }
 
   if (totalRemoved > 0) {
-    console.log(`[Dedup] Removed ${totalRemoved} cross-site duplicate events`);
+    console.log(`[Dedup] Removed ${totalRemoved} duplicate events`);
   }
 
   // removedフラグが立ったイベントのインデックスをresultごとに集約
