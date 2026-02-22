@@ -26,7 +26,7 @@ const SOURCE_LABELS: Record<string, { short: string; region: string }> = {
   ork: { short: "オホーツク", region: "北見・オホーツク" },
 };
 
-type Tab = "entries" | "members" | "scrape";
+type Tab = "entries" | "members" | "scrape" | "fees";
 
 interface Member {
   id: string;
@@ -71,11 +71,18 @@ export default function AdminPage() {
         >
           スクレイプ
         </button>
+        <button
+          className={tab === "fees" ? styles.tabActive : styles.tab}
+          onClick={() => setTab("fees")}
+        >
+          参加費
+        </button>
       </div>
 
       {tab === "entries" && <EntriesTab />}
       {tab === "members" && <MembersTab />}
       {tab === "scrape" && <ScrapeTab />}
+      {tab === "fees" && <FeesTab />}
     </div>
   );
 }
@@ -521,5 +528,243 @@ function ScrapeTab() {
         )}
       </div>
     </div>
+  );
+}
+
+/* ========== 参加費タブ ========== */
+interface FeeEvent {
+  id: string;
+  name: string;
+  date: string;
+  sourceId: string;
+  fee: number | null;
+  actualFee: number | null;
+  feeSource: string | null;
+}
+
+type FeeFilter = "all" | "unset" | "no-actual" | "upcoming";
+
+function FeesTab() {
+  const [events, setEvents] = useState<FeeEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<FeeFilter>("upcoming");
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editField, setEditField] = useState<"fee" | "actualFee">("fee");
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const fetchEvents = (f: FeeFilter) => {
+    setLoading(true);
+    const params = f !== "all" ? `?filter=${f}` : "";
+    fetch(`/api/admin/events${params}`)
+      .then((r) => r.json())
+      .then((d) => setEvents(d.events ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchEvents(filter);
+  }, [filter]);
+
+  const filtered = useMemo(() => {
+    if (!search) return events;
+    const q = search.toLowerCase();
+    return events.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.sourceId.toLowerCase().includes(q)
+    );
+  }, [events, search]);
+
+  const startEdit = (id: string, field: "fee" | "actualFee", current: number | null) => {
+    setEditingId(id);
+    setEditField(field);
+    setEditValue(current != null ? String(current) : "");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValue("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      const val = editValue.trim() ? Number(editValue.replace(/,/g, "")) : null;
+      const body: Record<string, number | null> = {};
+      body[editField] = val;
+      const res = await fetch(`/api/admin/events/${editingId}/fee`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("保存に失敗しました");
+      // ローカル更新
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === editingId
+            ? { ...e, [editField]: val, feeSource: "manual" }
+            : e
+        )
+      );
+      cancelEdit();
+    } catch {
+      alert("保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") saveEdit();
+    if (e.key === "Escape") cancelEdit();
+  };
+
+  const formatFee = (val: number | null) => {
+    if (val == null) return "―";
+    return `¥${val.toLocaleString()}`;
+  };
+
+  if (loading) return <div className={styles.loading}>読み込み中...</div>;
+
+  return (
+    <>
+      <div className={styles.filterRow}>
+        {([
+          { key: "all" as const, label: "すべて" },
+          { key: "upcoming" as const, label: "今後の大会" },
+          { key: "unset" as const, label: "参加費未設定" },
+          { key: "no-actual" as const, label: "実績未入力" },
+        ]).map((f) => (
+          <button
+            key={f.key}
+            className={
+              filter === f.key ? styles.filterChipActive : styles.filterChip
+            }
+            onClick={() => setFilter(f.key)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div className={styles.searchBar}>
+        <input
+          className={styles.searchInput}
+          placeholder="大会名 or ソースで検索..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      {filtered.length === 0 ? (
+        <div className={styles.empty}>該当するイベントはありません</div>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>大会名</th>
+              <th>日付</th>
+              <th>参加費</th>
+              <th>ソース</th>
+              <th>実績費</th>
+              <th>差額</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((e) => {
+              const diff =
+                e.fee != null && e.actualFee != null
+                  ? e.actualFee - e.fee
+                  : null;
+              return (
+                <tr key={e.id}>
+                  <td>
+                    <div>{e.name}</div>
+                    <div style={{ fontSize: 10, color: "#94a3b8" }}>
+                      {SOURCE_LABELS[e.sourceId]?.short ?? e.sourceId}
+                    </div>
+                  </td>
+                  <td style={{ whiteSpace: "nowrap" }}>{e.date}</td>
+                  <td
+                    className={styles.editableCell}
+                    onClick={() => startEdit(e.id, "fee", e.fee)}
+                  >
+                    {editingId === e.id && editField === "fee" ? (
+                      <input
+                        className={styles.inlineInput}
+                        type="number"
+                        value={editValue}
+                        onChange={(ev) => setEditValue(ev.target.value)}
+                        onKeyDown={handleKeyDown}
+                        onBlur={saveEdit}
+                        disabled={saving}
+                        autoFocus
+                      />
+                    ) : (
+                      <span className={e.fee == null ? styles.feeUnset : undefined}>
+                        {formatFee(e.fee)}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {e.feeSource ? (
+                      <span
+                        className={
+                          e.feeSource === "manual"
+                            ? styles.sourceManual
+                            : styles.sourcePdf
+                        }
+                      >
+                        {e.feeSource}
+                      </span>
+                    ) : (
+                      <span style={{ color: "#cbd5e1" }}>―</span>
+                    )}
+                  </td>
+                  <td
+                    className={styles.editableCell}
+                    onClick={() => startEdit(e.id, "actualFee", e.actualFee)}
+                  >
+                    {editingId === e.id && editField === "actualFee" ? (
+                      <input
+                        className={styles.inlineInput}
+                        type="number"
+                        value={editValue}
+                        onChange={(ev) => setEditValue(ev.target.value)}
+                        onKeyDown={handleKeyDown}
+                        onBlur={saveEdit}
+                        disabled={saving}
+                        autoFocus
+                      />
+                    ) : (
+                      <span className={e.actualFee == null ? styles.feeUnset : undefined}>
+                        {formatFee(e.actualFee)}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {diff != null ? (
+                      <span
+                        style={{
+                          color: diff > 0 ? "#dc2626" : diff < 0 ? "#16a34a" : "#94a3b8",
+                          fontWeight: diff !== 0 ? 600 : 400,
+                        }}
+                      >
+                        {diff > 0 ? "+" : ""}
+                        {formatFee(diff)}
+                      </span>
+                    ) : (
+                      <span style={{ color: "#cbd5e1" }}>―</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </>
   );
 }
