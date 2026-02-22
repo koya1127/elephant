@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import Stripe from "stripe";
+import { confirmEntryPayment } from "@/lib/entry-storage";
 
 export const runtime = "nodejs";
 
@@ -43,7 +44,25 @@ export async function POST(req: NextRequest) {
     const userId = session.metadata?.userId;
     const metaType = session.metadata?.type;
 
-    if (userId && metaType === "additional-entry") {
+    if (userId && metaType === "entry-fee") {
+      // エントリー都度決済完了 → エントリーを confirmed に
+      try {
+        const baseFee = Number(session.metadata?.baseFee) || 0;
+        const serviceFee = Number(session.metadata?.serviceFee) || 0;
+        const entry = await confirmEntryPayment(session.id, baseFee, serviceFee);
+        if (entry) {
+          console.log(`Entry payment confirmed: ${entry.id} for event ${entry.eventId}`);
+        } else {
+          console.warn(`Entry not found for stripe session: ${session.id}`);
+        }
+      } catch (err) {
+        console.error("Failed to confirm entry payment:", err);
+        return NextResponse.json(
+          { error: "Failed to confirm entry payment" },
+          { status: 500 }
+        );
+      }
+    } else if (userId && metaType === "additional-entry") {
       // 追加エントリー購入 → entryLimit を +1
       try {
         const clerk = await clerkClient();

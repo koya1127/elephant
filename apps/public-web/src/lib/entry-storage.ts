@@ -30,6 +30,9 @@ export async function addEntry(entry: Entry): Promise<void> {
     eventDate: entry.eventDate,
     disciplines: entry.disciplines,
     status: entry.status,
+    feePaid: entry.feePaid ?? null,
+    serviceFeePaid: entry.serviceFeePaid ?? null,
+    stripeSessionId: entry.stripeSessionId ?? null,
     createdAt: new Date(entry.createdAt),
   });
 }
@@ -61,6 +64,28 @@ export async function checkDuplicate(userId: string, eventId: string): Promise<b
   return rows.length > 0;
 }
 
+/**
+ * Stripe決済完了時にエントリーのステータスと決済情報を更新
+ */
+export async function confirmEntryPayment(
+  stripeSessionId: string,
+  feePaid: number,
+  serviceFeePaid: number
+): Promise<Entry | null> {
+  if (!process.env.POSTGRES_URL) return null;
+  const rows = await db
+    .update(entries)
+    .set({
+      status: "submitted",
+      feePaid,
+      serviceFeePaid,
+    })
+    .where(eq(entries.stripeSessionId, stripeSessionId))
+    .returning();
+  if (rows.length === 0) return null;
+  return rowToEntry(rows[0]);
+}
+
 // --- DB row → Entry 変換 ---
 
 type EntryRow = typeof entries.$inferSelect;
@@ -73,7 +98,10 @@ function rowToEntry(row: EntryRow): Entry {
     eventName: row.eventName,
     eventDate: row.eventDate,
     disciplines: (row.disciplines as string[]) || [],
-    status: (row.status as "submitted") || "submitted",
+    status: (row.status as "submitted" | "pending_payment") || "submitted",
+    feePaid: row.feePaid ?? undefined,
+    serviceFeePaid: row.serviceFeePaid ?? undefined,
+    stripeSessionId: row.stripeSessionId ?? undefined,
     createdAt: row.createdAt?.toISOString() || new Date().toISOString(),
   };
 }

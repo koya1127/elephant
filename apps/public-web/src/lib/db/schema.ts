@@ -52,6 +52,9 @@ export const entries = pgTable(
     eventDate: text("event_date").notNull(),
     disciplines: jsonb("disciplines").default([]),
     status: text("status").default("submitted"),
+    feePaid: integer("fee_paid"),
+    serviceFeePaid: integer("service_fee_paid"),
+    stripeSessionId: text("stripe_session_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   },
   (table) => [

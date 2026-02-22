@@ -66,7 +66,13 @@ export interface Entry {
   /** 選択した種目名 */
   disciplines: string[];
   /** ステータス */
-  status: "submitted";
+  status: "submitted" | "pending_payment";
+  /** 参加費として支払った額 */
+  feePaid?: number;
+  /** 手数料として支払った額 */
+  serviceFeePaid?: number;
+  /** Stripe Checkout Session ID */
+  stripeSessionId?: string;
   /** 作成日時（ISO string） */
   createdAt: string;
 }
