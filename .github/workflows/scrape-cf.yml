@@ -28,6 +28,6 @@ jobs:
 
       - name: Run koutairen scraper
         env:
-          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: xvfb-run npx tsx scripts/scrape-cf-sites.ts

@@ -2,107 +2,32 @@
  * ローカル実行用: tomakomai（苫小牧陸上競技協会）のスクレイピング
  *
  * JimdoサイトがVercelのIPをブロックするため、ローカルPCでのみ実行可能。
- * curl でHTML取得 → cheerioでパース → Vercel Blobにマージ
+ * curl でHTML取得 → cheerioでパース → Postgres DBにupsert
  *
  * 実行: pnpm scrape:tomakomai
  *
- * 必要な環境変数（.env.blob から自動読み込み）:
- *   BLOB_READ_WRITE_TOKEN
+ * 必要な環境変数（.env.local から自動読み込み）:
+ *   POSTGRES_URL
+ *   ANTHROPIC_API_KEY（PDF解析用、任意）
  */
 
 import { execSync } from "child_process";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import * as cheerio from "cheerio";
-import { list, put } from "@vercel/blob";
+import { loadEnv, upsertEventsToDb, type Event } from "./lib/db";
 import { parsePdfWithClaude } from "../apps/public-web/src/lib/pdfParser";
 import { downloadPdf } from "../apps/public-web/src/lib/scraper";
 
-// .env ファイルを読み込む共通関数
-function loadEnvFile(filename: string) {
-  try {
-    const envPath = resolve(process.cwd(), filename);
-    const content = readFileSync(envPath, "utf-8");
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      let val = trimmed.slice(eqIdx + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      if (!process.env[key]) {
-        process.env[key] = val;
-      }
-    }
-  } catch {
-    // ファイルがなければスキップ
-  }
-}
-loadEnvFile(".env.blob");
-loadEnvFile(".env.local");
+loadEnv();
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface Event {
-  id: string;
-  name: string;
-  date: string;
-  dateEnd?: string;
-  location: string;
-  disciplines: { name: string; grades: string[]; note?: string }[];
-  maxEntries?: number;
-  detailUrl: string;
-  sourceId: string;
-  entryDeadline?: string;
-  note?: string;
-  pdfUrl?: string;
-  pdfSize?: number;
-}
-
-interface ScrapeResult {
-  sourceId: string;
-  scrapedAt: string;
-  events: Event[];
-}
 
 interface ScrapedEventRaw {
   name: string;
   dateText: string;
   detailUrl?: string;
   pdfUrl?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Blob I/O
-// ---------------------------------------------------------------------------
-
-const BLOB_PATH = "events.json";
-
-async function readFromBlob(): Promise<ScrapeResult[]> {
-  try {
-    const { blobs } = await list({ prefix: BLOB_PATH, limit: 1 });
-    if (blobs.length === 0) return [];
-    const res = await fetch(blobs[0].url);
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-async function writeToBlob(data: ScrapeResult[]): Promise<void> {
-  const json = JSON.stringify(data, null, 2);
-  await put(BLOB_PATH, json, {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -136,11 +61,9 @@ function parseTomakomai(html: string): ScrapedEventRaw[] {
   const events: ScrapedEventRaw[] = [];
   const $ = cheerio.load(html);
 
-  // 全角数字→半角変換
   const toHalf = (s: string) =>
     s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 
-  // 令和→西暦変換
   const reiwaToYear = (r: number) => 2018 + r;
 
   $(".j-hgrid").each((_, el) => {
@@ -218,11 +141,9 @@ function parseTomakomai(html: string): ScrapedEventRaw[] {
       : `${westernYear}-${month}-${day}`;
 
     // PDFリンク: 後続兄弟（j-hgrid含む）から .j-imageSubtitle を探す
-    // Jimdo CreatorではPDF列が別のj-hgridになるため、j-hgridで即breakしない
     let pdfUrl: string | undefined;
     let sibling = block.next();
     for (let i = 0; i < 8 && sibling.length; i++) {
-      // 次のイベントのj-hgrid（font-size:22の大会名あり）なら終了
       if (sibling.hasClass("j-hgrid")) {
         const hasEventName = sibling.find("b, span, strong").toArray().some((tag) => {
           const s = $(tag).attr("style") || "";
@@ -272,8 +193,8 @@ function parseTomakomai(html: string): ScrapedEventRaw[] {
 async function main() {
   console.log("=== Tomakomai Scraper (ローカル実行) ===\n");
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error("BLOB_READ_WRITE_TOKEN が未設定。.env.blob を確認してください。");
+  if (!process.env.POSTGRES_URL) {
+    console.error("POSTGRES_URL が未設定。.env.local を確認してください。");
     process.exit(1);
   }
 
@@ -294,7 +215,7 @@ async function main() {
     process.exit(0);
   }
 
-  const events: Event[] = rawEvents.map((raw) => {
+  const events: (Event & { pdfUrl?: string })[] = rawEvents.map((raw) => {
     const [dateStart, dateEnd] = raw.dateText.includes("~")
       ? raw.dateText.split("~")
       : [raw.dateText, undefined];
@@ -317,7 +238,6 @@ async function main() {
     const pdfEvents = events.filter((e) => e.pdfUrl);
     console.log(`[PDF] ${pdfEvents.length} events have PDF URLs`);
 
-    // 3件並列で処理
     const chunkSize = 3;
     for (let i = 0; i < pdfEvents.length; i += chunkSize) {
       const chunk = pdfEvents.slice(i, i + chunkSize);
@@ -343,25 +263,16 @@ async function main() {
     console.warn("[PDF] ANTHROPIC_API_KEY 未設定。種目解析をスキップ。");
   }
 
-  // 4. Vercel Blob マージ
-  console.log("\n[Blob] Reading existing data...");
-  const existing = await readFromBlob();
-  const idx = existing.findIndex((e) => e.sourceId === "tomakomai");
-  if (idx >= 0) {
-    console.log(`[Blob] Replacing tomakomai: ${existing[idx].events.length} → ${events.length} events`);
-    existing[idx] = { sourceId: "tomakomai", scrapedAt: new Date().toISOString(), events };
-  } else {
-    console.log(`[Blob] Adding tomakomai: ${events.length} events`);
-    existing.push({ sourceId: "tomakomai", scrapedAt: new Date().toISOString(), events });
-  }
-
-  console.log("[Blob] Writing...");
-  await writeToBlob(existing);
+  // 4. DB upsert
+  const scrapedAt = new Date().toISOString();
+  console.log("\n[DB] Upserting events...");
+  await upsertEventsToDb("tomakomai", events, scrapedAt);
 
   console.log(`\n=== Done: tomakomai ${events.length} events ===`);
   for (const e of events) {
     console.log(`  - ${e.date} ${e.name}${e.pdfUrl ? " [PDF]" : ""}`);
   }
+  process.exit(0);
 }
 
 main().catch((err) => {

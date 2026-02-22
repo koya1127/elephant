@@ -2,95 +2,19 @@
  * ローカル実行用: muroriku（室蘭地方陸上競技協会）のスクレイピング
  *
  * WixサイトはVercelのIPをブロックするため、ローカルPCでのみ実行可能。
- * curl でHTML取得 → cheerioの<p>要素ごとパース → Vercel Blobにマージ
+ * curl でHTML取得 → cheerioの<p>要素ごとパース → Postgres DBにupsert
  *
  * 実行: pnpm scrape:muroriku
  *
- * 必要な環境変数（.env.blob から自動読み込み）:
- *   BLOB_READ_WRITE_TOKEN
+ * 必要な環境変数（.env.local から自動読み込み）:
+ *   POSTGRES_URL
  */
 
 import { execSync } from "child_process";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import * as cheerio from "cheerio";
-import { list, put } from "@vercel/blob";
+import { loadEnv, upsertEventsToDb, type Event } from "./lib/db";
 
-// .env.blob を読み込み
-function loadEnv() {
-  try {
-    const envPath = resolve(process.cwd(), ".env.blob");
-    const content = readFileSync(envPath, "utf-8");
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      let val = trimmed.slice(eqIdx + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      if (!process.env[key]) process.env[key] = val;
-    }
-  } catch {
-    // .env.blob がなければスキップ
-  }
-}
 loadEnv();
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface Event {
-  id: string;
-  name: string;
-  date: string;
-  dateEnd?: string;
-  location: string;
-  disciplines: { name: string; grades: string[]; note?: string }[];
-  maxEntries?: number;
-  detailUrl: string;
-  sourceId: string;
-  entryDeadline?: string;
-  note?: string;
-  pdfSize?: number;
-}
-
-interface ScrapeResult {
-  sourceId: string;
-  scrapedAt: string;
-  events: Event[];
-}
-
-// ---------------------------------------------------------------------------
-// Blob I/O
-// ---------------------------------------------------------------------------
-
-const BLOB_PATH = "events.json";
-
-async function readFromBlob(): Promise<ScrapeResult[]> {
-  try {
-    const { blobs } = await list({ prefix: BLOB_PATH, limit: 1 });
-    if (blobs.length === 0) return [];
-    const res = await fetch(blobs[0].url);
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-async function writeToBlob(data: ScrapeResult[]): Promise<void> {
-  const json = JSON.stringify(data, null, 2);
-  await put(BLOB_PATH, json, {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -168,8 +92,6 @@ function parseMuroriku(html: string): Array<{ name: string; dateText: string; de
     if (endMatch) {
       const endMonth = endMatch[1] ? endMatch[1].padStart(2, "0") : month;
       const endDay = endMatch[2].padStart(2, "0");
-      // パターンA: "大会名～終了日" → ～以降を削除
-      // パターンB: "～終了日（曜）大会名" → nameが～始まりの場合、終了日の後の大会名を取得
       if (/^[～~]/.test(name)) {
         name = name.replace(/^[～~]\s*(?:\d{1,2}月\s*)?\d{1,2}日[（(][^）)]*[）)]\s*/, "").trim();
       } else {
@@ -194,8 +116,8 @@ function parseMuroriku(html: string): Array<{ name: string; dateText: string; de
 async function main() {
   console.log("=== Muroriku Scraper (ローカル実行) ===\n");
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error("BLOB_READ_WRITE_TOKEN が未設定。.env.blob を確認してください。");
+  if (!process.env.POSTGRES_URL) {
+    console.error("POSTGRES_URL が未設定。.env.local を確認してください。");
     process.exit(1);
   }
 
@@ -230,24 +152,15 @@ async function main() {
     };
   });
 
-  console.log("\n[Blob] Reading existing data...");
-  const existing = await readFromBlob();
-  const idx = existing.findIndex((e) => e.sourceId === "muroriku");
-  if (idx >= 0) {
-    console.log(`[Blob] Replacing muroriku: ${existing[idx].events.length} → ${events.length} events`);
-    existing[idx] = { sourceId: "muroriku", scrapedAt: new Date().toISOString(), events };
-  } else {
-    console.log(`[Blob] Adding muroriku: ${events.length} events`);
-    existing.push({ sourceId: "muroriku", scrapedAt: new Date().toISOString(), events });
-  }
-
-  console.log("[Blob] Writing...");
-  await writeToBlob(existing);
+  const scrapedAt = new Date().toISOString();
+  console.log("\n[DB] Upserting events...");
+  await upsertEventsToDb("muroriku", events, scrapedAt);
 
   console.log(`\n=== Done: muroriku ${events.length} events ===`);
   for (const e of events) {
     console.log(`  - ${e.date}${e.dateEnd ? "~" + e.dateEnd : ""} ${e.name}`);
   }
+  process.exit(0);
 }
 
 main().catch((err) => {

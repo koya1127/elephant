@@ -1,11 +1,11 @@
 /**
  * GitHub Actions用スクリプト: koutairen（高体連）のスクレイピング
  *
- * Playwright + stealth でHTML取得 → スケジュールPDFをClaude解析 → Vercel Blobにマージ
+ * Playwright + stealth でHTML取得 → スケジュールPDFをClaude解析 → Postgres DBにupsert
  *
  * 環境変数:
- *   BLOB_READ_WRITE_TOKEN — Vercel Blob読み書きトークン
- *   ANTHROPIC_API_KEY     — Claude API（PDF解析用）
+ *   POSTGRES_URL         — Postgres接続URL
+ *   ANTHROPIC_API_KEY    — Claude API（PDF解析用）
  *
  * 実行: npx tsx scripts/scrape-cf-sites.ts
  */
@@ -13,8 +13,10 @@
 import { chromium } from "playwright-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as cheerio from "cheerio";
-import { list, put } from "@vercel/blob";
 import Anthropic from "@anthropic-ai/sdk";
+import { loadEnv, upsertEventsToDb, type Event, type Discipline } from "./lib/db";
+
+loadEnv();
 
 chromium.use(StealthPlugin());
 
@@ -22,66 +24,11 @@ chromium.use(StealthPlugin());
 // Types
 // ---------------------------------------------------------------------------
 
-interface Discipline {
-  name: string;
-  grades: string[];
-  note?: string;
-}
-
-interface Event {
-  id: string;
-  name: string;
-  date: string;
-  dateEnd?: string;
-  location: string;
-  disciplines: Discipline[];
-  maxEntries?: number;
-  detailUrl: string;
-  sourceId: string;
-  entryDeadline?: string;
-  note?: string;
-  pdfSize?: number;
-}
-
-interface ScrapeResult {
-  sourceId: string;
-  scrapedAt: string;
-  events: Event[];
-}
-
 interface ScrapedEventRaw {
   name: string;
   dateText: string;
   pdfUrl?: string;
   detailUrl?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Blob I/O
-// ---------------------------------------------------------------------------
-
-const BLOB_PATH = "events.json";
-
-async function readFromBlob(): Promise<ScrapeResult[]> {
-  try {
-    const { blobs } = await list({ prefix: BLOB_PATH, limit: 1 });
-    if (blobs.length === 0) return [];
-    const res = await fetch(blobs[0].url);
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-async function writeToBlob(data: ScrapeResult[]): Promise<void> {
-  const json = JSON.stringify(data, null, 2);
-  await put(BLOB_PATH, json, {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -298,13 +245,12 @@ async function scrapeOsrk(): Promise<ScrapedEventRaw[]> {
 // メイン処理
 // ---------------------------------------------------------------------------
 
-async function scrapeKoutairen(existing: ScrapeResult[]): Promise<void> {
+async function scrapeKoutairenSite(): Promise<Event[]> {
   console.log("=== Koutairen Scraper ===\n");
 
   const url = "https://www.doukoutairen-rikujyou.com/%E5%A4%A7%E4%BC%9A%E6%97%A5%E7%A8%8B/";
   const baseUrl = "https://www.doukoutairen-rikujyou.com/";
 
-  // Playwright でHTML取得
   const browser = await chromium.launch({
     headless: false,
     args: ["--disable-blink-features=AutomationControlled"],
@@ -342,13 +288,13 @@ async function scrapeKoutairen(existing: ScrapeResult[]): Promise<void> {
 
   if (!html) {
     console.error("[Koutairen] No HTML, skipping");
-    return;
+    return [];
   }
 
   const rawEvents = await parseKoutairen(html, baseUrl);
   console.log(`[koutairen] Parsed ${rawEvents.length} events`);
 
-  const events: Event[] = rawEvents.map((raw) => {
+  return rawEvents.map((raw) => {
     const [dateStart, dateEnd] = raw.dateText.includes("~")
       ? raw.dateText.split("~")
       : [raw.dateText, undefined];
@@ -358,34 +304,14 @@ async function scrapeKoutairen(existing: ScrapeResult[]): Promise<void> {
       date: dateStart,
       dateEnd,
       location: extractLocationFromName(raw.name),
-      disciplines: [],
+      disciplines: [] as Discipline[],
       detailUrl: raw.detailUrl || url,
       sourceId: "koutairen",
     };
   });
-
-  const result: ScrapeResult = {
-    sourceId: "koutairen",
-    scrapedAt: new Date().toISOString(),
-    events,
-  };
-
-  const idx = existing.findIndex((e) => e.sourceId === "koutairen");
-  if (idx >= 0) {
-    console.log(`[Blob] Replacing koutairen: ${existing[idx].events.length} → ${events.length} events`);
-    existing[idx] = result;
-  } else {
-    console.log(`[Blob] Adding koutairen: ${events.length} events`);
-    existing.push(result);
-  }
-
-  console.log(`\n=== Done: koutairen ${events.length} events ===`);
-  for (const e of events) {
-    console.log(`  - ${e.date} ${e.name}`);
-  }
 }
 
-async function runOsrk(existing: ScrapeResult[]): Promise<void> {
+async function runOsrkSite(): Promise<Event[]> {
   console.log("\n=== Osrk Scraper (小樽後志) ===\n");
 
   try {
@@ -394,10 +320,10 @@ async function runOsrk(existing: ScrapeResult[]): Promise<void> {
 
     if (rawEvents.length === 0) {
       console.log("[osrk] 0 events, keeping existing data");
-      return;
+      return [];
     }
 
-    const events: Event[] = rawEvents.map((raw) => {
+    return rawEvents.map((raw) => {
       const [dateStart, dateEnd] = raw.dateText.includes("~")
         ? raw.dateText.split("~")
         : [raw.dateText, undefined];
@@ -407,53 +333,51 @@ async function runOsrk(existing: ScrapeResult[]): Promise<void> {
         date: dateStart,
         dateEnd,
         location: extractLocationFromName(raw.name),
-        disciplines: [],
+        disciplines: [] as Discipline[],
         detailUrl: raw.detailUrl || "https://osrk.jp/",
         sourceId: "osrk",
       };
     });
-
-    const result: ScrapeResult = {
-      sourceId: "osrk",
-      scrapedAt: new Date().toISOString(),
-      events,
-    };
-
-    const idx = existing.findIndex((e) => e.sourceId === "osrk");
-    if (idx >= 0) {
-      console.log(`[Blob] Replacing osrk: ${existing[idx].events.length} → ${events.length} events`);
-      existing[idx] = result;
-    } else {
-      console.log(`[Blob] Adding osrk: ${events.length} events`);
-      existing.push(result);
-    }
-
-    console.log(`\n=== Done: osrk ${events.length} events ===`);
-    for (const e of events) {
-      console.log(`  - ${e.date} ${e.name}`);
-    }
   } catch (e) {
     console.error("[osrk] Failed:", e);
+    return [];
   }
 }
 
 async function main() {
   console.log("=== CF Sites Scraper (GitHub Actions) ===\n");
 
-  // Vercel Blob の既存データを読み込み
-  console.log("[Blob] Reading existing data...");
-  const existing = await readFromBlob();
+  if (!process.env.POSTGRES_URL) {
+    console.error("POSTGRES_URL が未設定。");
+    process.exit(1);
+  }
+
+  const scrapedAt = new Date().toISOString();
 
   // koutairen (Playwright必須)
-  await scrapeKoutairen(existing);
+  const koutairenEvents = await scrapeKoutairenSite();
+  if (koutairenEvents.length > 0) {
+    console.log(`\n[DB] Upserting koutairen ${koutairenEvents.length} events...`);
+    await upsertEventsToDb("koutairen", koutairenEvents, scrapedAt);
+    console.log(`=== Done: koutairen ${koutairenEvents.length} events ===`);
+    for (const e of koutairenEvents) {
+      console.log(`  - ${e.date} ${e.name}`);
+    }
+  }
 
   // osrk (WP REST API、Playwright不要)
-  await runOsrk(existing);
+  const osrkEvents = await runOsrkSite();
+  if (osrkEvents.length > 0) {
+    console.log(`\n[DB] Upserting osrk ${osrkEvents.length} events...`);
+    await upsertEventsToDb("osrk", osrkEvents, scrapedAt);
+    console.log(`=== Done: osrk ${osrkEvents.length} events ===`);
+    for (const e of osrkEvents) {
+      console.log(`  - ${e.date} ${e.name}`);
+    }
+  }
 
-  // Blob に書き戻し
-  console.log("\n[Blob] Writing...");
-  await writeToBlob(existing);
-  console.log("[Blob] Done.");
+  console.log("\n[Done] All sites processed.");
+  process.exit(0);
 }
 
 main().catch((err) => {

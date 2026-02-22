@@ -6,90 +6,14 @@
  *
  * 実行: pnpm scrape:osrk
  *
- * 必要な環境変数（.env.blob から自動読み込み）:
- *   BLOB_READ_WRITE_TOKEN
+ * 必要な環境変数（.env.local から自動読み込み）:
+ *   POSTGRES_URL
  */
 
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import * as cheerio from "cheerio";
-import { list, put } from "@vercel/blob";
+import { loadEnv, upsertEventsToDb, type Event } from "./lib/db";
 
-// .env.blob を読み込み
-function loadEnv() {
-  try {
-    const envPath = resolve(process.cwd(), ".env.blob");
-    const content = readFileSync(envPath, "utf-8");
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      let val = trimmed.slice(eqIdx + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      if (!process.env[key]) process.env[key] = val;
-    }
-  } catch {
-    // .env.blob がなければスキップ
-  }
-}
 loadEnv();
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface Event {
-  id: string;
-  name: string;
-  date: string;
-  dateEnd?: string;
-  location: string;
-  disciplines: { name: string; grades: string[]; note?: string }[];
-  maxEntries?: number;
-  detailUrl: string;
-  sourceId: string;
-  entryDeadline?: string;
-  note?: string;
-  pdfSize?: number;
-}
-
-interface ScrapeResult {
-  sourceId: string;
-  scrapedAt: string;
-  events: Event[];
-}
-
-// ---------------------------------------------------------------------------
-// Blob I/O
-// ---------------------------------------------------------------------------
-
-const BLOB_PATH = "events.json";
-
-async function readFromBlob(): Promise<ScrapeResult[]> {
-  try {
-    const { blobs } = await list({ prefix: BLOB_PATH, limit: 1 });
-    if (blobs.length === 0) return [];
-    const res = await fetch(blobs[0].url);
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-async function writeToBlob(data: ScrapeResult[]): Promise<void> {
-  const json = JSON.stringify(data, null, 2);
-  await put(BLOB_PATH, json, {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -166,8 +90,8 @@ async function scrapeOsrk(): Promise<Array<{ name: string; dateText: string; det
 async function main() {
   console.log("=== Osrk Scraper (ローカル実行) ===\n");
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error("BLOB_READ_WRITE_TOKEN が未設定。.env.blob を確認してください。");
+  if (!process.env.POSTGRES_URL) {
+    console.error("POSTGRES_URL が未設定。.env.local を確認してください。");
     process.exit(1);
   }
 
@@ -195,24 +119,15 @@ async function main() {
     };
   });
 
-  console.log("\n[Blob] Reading existing data...");
-  const existing = await readFromBlob();
-  const idx = existing.findIndex((e) => e.sourceId === "osrk");
-  if (idx >= 0) {
-    console.log(`[Blob] Replacing osrk: ${existing[idx].events.length} → ${events.length} events`);
-    existing[idx] = { sourceId: "osrk", scrapedAt: new Date().toISOString(), events };
-  } else {
-    console.log(`[Blob] Adding osrk: ${events.length} events`);
-    existing.push({ sourceId: "osrk", scrapedAt: new Date().toISOString(), events });
-  }
-
-  console.log("[Blob] Writing...");
-  await writeToBlob(existing);
+  const scrapedAt = new Date().toISOString();
+  console.log("\n[DB] Upserting events...");
+  await upsertEventsToDb("osrk", events, scrapedAt);
 
   console.log(`\n=== Done: osrk ${events.length} events ===`);
   for (const e of events) {
     console.log(`  - ${e.date} ${e.name}`);
   }
+  process.exit(0);
 }
 
 main().catch((err) => {

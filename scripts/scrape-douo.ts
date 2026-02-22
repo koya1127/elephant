@@ -2,103 +2,28 @@
  * ローカル実行用: douo（道央陸上競技協会）のスクレイピング
  *
  * CloudflareがデータセンターIPをブロックするため、ローカルPCでのみ実行可能。
- * curl でHTML取得 → cheerioでパース → Vercel Blobにマージ
+ * curl でHTML取得 → cheerioでパース → Postgres DBにupsert
  *
  * 実行: pnpm scrape:douo
  *
- * 必要な環境変数（.env.blob から自動読み込み）:
- *   BLOB_READ_WRITE_TOKEN
+ * 必要な環境変数（.env.local から自動読み込み）:
+ *   POSTGRES_URL
  */
 
 import { execSync } from "child_process";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import * as cheerio from "cheerio";
-import { list, put } from "@vercel/blob";
+import { loadEnv, upsertEventsToDb, type Event } from "./lib/db";
 
-// .env.blob を読み込み
-function loadEnv() {
-  try {
-    const envPath = resolve(process.cwd(), ".env.blob");
-    const content = readFileSync(envPath, "utf-8");
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      let val = trimmed.slice(eqIdx + 1).trim();
-      // クォート除去
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      if (!process.env[key]) {
-        process.env[key] = val;
-      }
-    }
-  } catch {
-    // .env.blob がなければスキップ
-  }
-}
 loadEnv();
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface Event {
-  id: string;
-  name: string;
-  date: string;
-  dateEnd?: string;
-  location: string;
-  disciplines: { name: string; grades: string[]; note?: string }[];
-  maxEntries?: number;
-  detailUrl: string;
-  sourceId: string;
-  entryDeadline?: string;
-  note?: string;
-  pdfSize?: number;
-}
-
-interface ScrapeResult {
-  sourceId: string;
-  scrapedAt: string;
-  events: Event[];
-}
-
 interface ScrapedEventRaw {
   name: string;
   dateText: string;
   detailUrl?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Blob I/O
-// ---------------------------------------------------------------------------
-
-const BLOB_PATH = "events.json";
-
-async function readFromBlob(): Promise<ScrapeResult[]> {
-  try {
-    const { blobs } = await list({ prefix: BLOB_PATH, limit: 1 });
-    if (blobs.length === 0) return [];
-    const res = await fetch(blobs[0].url);
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-async function writeToBlob(data: ScrapeResult[]): Promise<void> {
-  const json = JSON.stringify(data, null, 2);
-  await put(BLOB_PATH, json, {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +62,6 @@ function parseDouo(html: string): ScrapedEventRaw[] {
   const $ = cheerio.load(html);
   const bodyText = $("body").text();
 
-  // 道央サイトの構造: 「【終了】大会名 YYYY年M月D日(曜)開催」
-  // → 大会名は日付の **前** にある
   const dateRe = /(\d{4})年\s*(\d{1,2})月(\d{1,2})日/g;
   const datePositions: Array<{ year: string; month: string; day: string; index: number }> = [];
   let m;
@@ -149,29 +72,22 @@ function parseDouo(html: string): ScrapedEventRaw[] {
   for (let i = 0; i < datePositions.length; i++) {
     const dp = datePositions[i];
 
-    // 日付の前のテキストから大会名を抽出
-    // 前の日付の「開催」以降 ～ この日付の直前 を切り出す
     const prevEnd = i > 0
       ? bodyText.indexOf("開催", datePositions[i - 1].index)
       : 0;
     const nameStart = prevEnd !== -1 ? prevEnd : 0;
     const before = bodyText.substring(nameStart, dp.index);
 
-    // 大会名は日付の前にある
-    // パターン: 「【終了】大会名 YYYY年M月D日」
-    // 前のテキストから最後の【終了】or【中止】以降を大会名とする
     let name = "";
     const tagMatch = before.match(/(?:【終了】|【中止】)\s*([^【]+)$/);
     if (tagMatch) {
       name = tagMatch[1].trim();
     } else {
-      // タグなし: 最後の区切り（審判編成/タイムテーブル/要項等）の後のテキスト
       const afterDoc = before.match(/(?:審判編成|タイムテーブル|競技者注意事項|要項)\s*(.+)$/);
       if (afterDoc) {
         name = afterDoc[1].trim();
       }
     }
-    // 名前が長すぎる場合はゴミ混入 → 最後の文書キーワード以降を繰り返し切り詰め
     while (name.length > 40) {
       const lastPart = name.match(/(?:審判編成|タイムテーブル|競技者注意事項|要項)\s*(.+)$/);
       if (lastPart && lastPart[1].length < name.length) {
@@ -181,7 +97,6 @@ function parseDouo(html: string): ScrapedEventRaw[] {
       }
     }
 
-    // 終了日
     const afterDate = bodyText.substring(dp.index, dp.index + 80);
     const endDayMatch = afterDate.match(/[・～]\s*(\d{1,2})日/);
     const endDay = endDayMatch ? endDayMatch[1].padStart(2, "0") : null;
@@ -194,7 +109,6 @@ function parseDouo(html: string): ScrapedEventRaw[] {
 
     if (!name || name.length < 3) continue;
 
-    // 重複排除
     const isDupe = events.some((e) =>
       e.dateText === dateStr && e.name.slice(0, 5) === name.slice(0, 5)
     );
@@ -213,8 +127,8 @@ function parseDouo(html: string): ScrapedEventRaw[] {
 async function main() {
   console.log("=== Douo Scraper (ローカル実行) ===\n");
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error("BLOB_READ_WRITE_TOKEN が未設定。.env.blob を確認してください。");
+  if (!process.env.POSTGRES_URL) {
+    console.error("POSTGRES_URL が未設定。.env.local を確認してください。");
     process.exit(1);
   }
 
@@ -251,25 +165,16 @@ async function main() {
     };
   });
 
-  // 3. Vercel Blob マージ
-  console.log("\n[Blob] Reading existing data...");
-  const existing = await readFromBlob();
-  const idx = existing.findIndex((e) => e.sourceId === "douo");
-  if (idx >= 0) {
-    console.log(`[Blob] Replacing douo: ${existing[idx].events.length} → ${events.length} events`);
-    existing[idx] = { sourceId: "douo", scrapedAt: new Date().toISOString(), events };
-  } else {
-    console.log(`[Blob] Adding douo: ${events.length} events`);
-    existing.push({ sourceId: "douo", scrapedAt: new Date().toISOString(), events });
-  }
-
-  console.log("[Blob] Writing...");
-  await writeToBlob(existing);
+  // 3. DB upsert
+  const scrapedAt = new Date().toISOString();
+  console.log("\n[DB] Upserting events...");
+  await upsertEventsToDb("douo", events, scrapedAt);
 
   console.log(`\n=== Done: douo ${events.length} events ===`);
   for (const e of events) {
     console.log(`  - ${e.date} ${e.name}`);
   }
+  process.exit(0);
 }
 
 main().catch((err) => {

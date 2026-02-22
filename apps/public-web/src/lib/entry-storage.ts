@@ -1,30 +1,81 @@
 import type { Entry } from "./types";
-
-const BLOB_PATH = "entries.json";
+import { db } from "./db";
+import { entries } from "./db/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function readEntries(): Promise<Entry[]> {
-  if (process.env.VERCEL) {
-    return readFromBlob();
+  if (!process.env.POSTGRES_URL) {
+    return readFromFile();
   }
-  return readFromFile();
-}
-
-export async function writeEntries(data: Entry[]): Promise<void> {
-  if (process.env.VERCEL) {
-    return writeToBlob(data);
+  try {
+    const rows = await db.select().from(entries);
+    return rows.map(rowToEntry);
+  } catch (e) {
+    console.error("[entry-storage] readEntries error:", e);
+    return [];
   }
-  return writeToFile(data);
 }
 
 export async function addEntry(entry: Entry): Promise<void> {
-  const entries = await readEntries();
-  entries.push(entry);
-  await writeEntries(entries);
+  if (!process.env.POSTGRES_URL) {
+    const all = await readFromFile();
+    all.push(entry);
+    return writeToFile(all);
+  }
+  await db.insert(entries).values({
+    id: entry.id,
+    userId: entry.userId,
+    eventId: entry.eventId,
+    eventName: entry.eventName,
+    eventDate: entry.eventDate,
+    disciplines: entry.disciplines,
+    status: entry.status,
+    createdAt: new Date(entry.createdAt),
+  });
 }
 
 export async function getUserEntries(userId: string): Promise<Entry[]> {
-  const entries = await readEntries();
-  return entries.filter((e) => e.userId === userId);
+  if (!process.env.POSTGRES_URL) {
+    const all = await readFromFile();
+    return all.filter((e) => e.userId === userId);
+  }
+  try {
+    const rows = await db.select().from(entries).where(eq(entries.userId, userId));
+    return rows.map(rowToEntry);
+  } catch (e) {
+    console.error("[entry-storage] getUserEntries error:", e);
+    return [];
+  }
+}
+
+export async function checkDuplicate(userId: string, eventId: string): Promise<boolean> {
+  if (!process.env.POSTGRES_URL) {
+    const all = await readFromFile();
+    return all.some((e) => e.userId === userId && e.eventId === eventId);
+  }
+  const rows = await db
+    .select({ id: entries.id })
+    .from(entries)
+    .where(and(eq(entries.userId, userId), eq(entries.eventId, eventId)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+// --- DB row → Entry 変換 ---
+
+type EntryRow = typeof entries.$inferSelect;
+
+function rowToEntry(row: EntryRow): Entry {
+  return {
+    id: row.id,
+    userId: row.userId,
+    eventId: row.eventId,
+    eventName: row.eventName,
+    eventDate: row.eventDate,
+    disciplines: (row.disciplines as string[]) || [],
+    status: (row.status as "submitted") || "submitted",
+    createdAt: row.createdAt?.toISOString() || new Date().toISOString(),
+  };
 }
 
 // --- ローカル: ファイルシステム ---
@@ -47,30 +98,4 @@ async function writeToFile(data: Entry[]): Promise<void> {
   const dir = join(process.cwd(), "data");
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, "entries.json"), JSON.stringify(data, null, 2), "utf-8");
-}
-
-// --- Vercel: Blob ストレージ ---
-
-async function readFromBlob(): Promise<Entry[]> {
-  const { list } = await import("@vercel/blob");
-  try {
-    const { blobs } = await list({ prefix: BLOB_PATH, limit: 1 });
-    if (blobs.length === 0) return [];
-    const res = await fetch(blobs[0].url);
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-async function writeToBlob(data: Entry[]): Promise<void> {
-  const { put } = await import("@vercel/blob");
-  const json = JSON.stringify(data, null, 2);
-  await put(BLOB_PATH, json, {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-  });
 }

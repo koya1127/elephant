@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { addEntry, getUserEntries, readEntries } from "@/lib/entry-storage";
+import { addEntry, getUserEntries, checkDuplicate } from "@/lib/entry-storage";
 import type { Entry } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -59,10 +59,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 重複チェック
-  const allEntries = await readEntries();
-  const duplicate = allEntries.find(
-    (e) => e.userId === userId && e.eventId === eventId
-  );
+  const duplicate = await checkDuplicate(userId, eventId);
   if (duplicate) {
     return NextResponse.json(
       { error: "この大会には既にエントリー済みです" },

@@ -53,3 +53,4 @@ C?Usersfab24*
 
 # One-off scripts
 scripts/create-stripe-prices.mjs
+.env*.local
