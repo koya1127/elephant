@@ -162,9 +162,8 @@ export async function POST(request: Request) {
       } as ScrapeResult & { skippedPdfs: number });
     }
 
-    // クロスサイト重複除去（北海道全競技会日程 vs 地域サイト）
-    // 地域サイトの方が要項PDF等の詳細があるため優先
-    deduplicateHokkaidoEvents(allResults, existing);
+    // 全ソース間クロスサイト重複除去・マージ
+    deduplicateCrossSite(allResults, existing);
 
     // 同じsourceIdのデータを更新（0件の場合は既存データを保持）
     for (const result of allResults) {
@@ -242,44 +241,196 @@ function normalizeName(name: string): string {
 }
 
 /**
- * 北海道全競技会日程のイベントから、他サイトと重複するものを除外する
- * 地域サイト（空知・釧路・札幌・道央）は要項PDF等の詳細を持つため優先
+ * 全ソース間クロスサイト重複除去・マージ
+ * 同じ日付で名前が類似するイベントを検出し、情報の多い方を残して補完する
  */
-function deduplicateHokkaidoEvents(
+function deduplicateCrossSite(
   allResults: ScrapeResult[],
   existingResults: ScrapeResult[]
 ): void {
-  const hokkaidoResult = allResults.find((r) => r.sourceId === "hokkaido");
-  if (!hokkaidoResult) return;
+  type EventEntry = {
+    event: Event;
+    result: ScrapeResult;
+    index: number;
+    removed: boolean;
+  };
 
-  // 他サイトのイベントを集約（今回のスクレイプ結果 + 既存データ）
-  const otherEvents: Array<{ date: string; name: string }> = [];
+  // 全イベントをフラット化（source参照付き）
+  const allEvents: EventEntry[] = [];
   for (const result of [...allResults, ...existingResults]) {
-    if (result.sourceId === "hokkaido") continue;
-    for (const event of result.events) {
-      otherEvents.push({ date: event.date, name: normalizeName(event.name) });
+    for (let i = 0; i < result.events.length; i++) {
+      allEvents.push({ event: result.events[i], result, index: i, removed: false });
     }
   }
 
-  const before = hokkaidoResult.events.length;
-  hokkaidoResult.events = hokkaidoResult.events.filter((hEvent) => {
-    const hDate = hEvent.date;
-    const hName = normalizeName(hEvent.name);
-    // 同じ日付で名前が類似するイベントが他サイトにあれば除外
-    const isDupe = otherEvents.some((other) => {
-      if (other.date !== hDate) return false;
-      // 先頭6文字の部分一致で判定（"第XX回"等のプレフィックスを含めて比較）
-      if (hName.length < 6 || other.name.length < 6) {
-        return hName === other.name;
-      }
-      return hName.includes(other.name.substring(0, 6)) ||
-        other.name.includes(hName.substring(0, 6));
-    });
-    return !isDupe;
-  });
-
-  const removed = before - hokkaidoResult.events.length;
-  if (removed > 0) {
-    console.log(`[Dedup] Removed ${removed} duplicate events from hokkaido (${before} → ${hokkaidoResult.events.length})`);
+  // 日付でグループ化
+  const byDate = new Map<string, EventEntry[]>();
+  for (const entry of allEvents) {
+    const group = byDate.get(entry.event.date) || [];
+    group.push(entry);
+    byDate.set(entry.event.date, group);
   }
+
+  let totalRemoved = 0;
+
+  // 各日付グループ内で異なるsourceId間の重複を検出
+  for (const [, group] of byDate) {
+    for (let i = 0; i < group.length; i++) {
+      if (group[i].removed) continue;
+      for (let j = i + 1; j < group.length; j++) {
+        if (group[j].removed) continue;
+        if (group[i].event.sourceId === group[j].event.sourceId) continue;
+
+        const a = group[i], b = group[j];
+        if (!isDuplicate(a.event, b.event)) continue;
+
+        // 重複検出 → 情報の多い方を残し、少ない方を除去
+        const [keeper, loser] = pickKeeper(a, b);
+        mergeEventInfo(keeper.event, loser.event);
+        loser.removed = true;
+        totalRemoved++;
+        console.log(
+          `[Dedup] Merged: "${loser.event.name}" (${loser.event.sourceId}) → "${keeper.event.name}" (${keeper.event.sourceId})`
+        );
+      }
+    }
+  }
+
+  if (totalRemoved > 0) {
+    console.log(`[Dedup] Removed ${totalRemoved} cross-site duplicate events`);
+  }
+
+  // removedフラグが立ったイベントのインデックスをresultごとに集約
+  const removedIndices = new Map<ScrapeResult, Set<number>>();
+  for (const entry of allEvents) {
+    if (!entry.removed) continue;
+    let s = removedIndices.get(entry.result);
+    if (!s) {
+      s = new Set();
+      removedIndices.set(entry.result, s);
+    }
+    s.add(entry.index);
+  }
+
+  // 除去対象を各resultから削除
+  for (const [result, indices] of removedIndices) {
+    result.events = result.events.filter((_, i) => !indices.has(i));
+  }
+}
+
+/**
+ * 2つのイベントが重複しているか判定する
+ */
+function isDuplicate(a: Event, b: Event): boolean {
+  const nameA = normalizeName(a.name);
+  const nameB = normalizeName(b.name);
+
+  // 条件1: 名前の包含チェック
+  // 短い名前（10文字未満）が長い名前に包含されるケースは誤検知が多い
+  // 例: 「記録会第2戦」が「空知陸上競技記録会第2戦」に包含 → 別地域なので除外すべき
+  // 短い方が10文字以上、かつ長い方との長さ比が50%以上の場合のみ重複とみなす
+  const shorter = nameA.length <= nameB.length ? nameA : nameB;
+  const longer = nameA.length <= nameB.length ? nameB : nameA;
+  if (longer.includes(shorter) && shorter.length >= 10 &&
+      shorter.length / longer.length >= 0.5) return true;
+
+  // 条件2: 同じ場所 + 部分名前一致（先頭6文字）
+  if (
+    a.location && b.location &&
+    a.location === b.location &&
+    nameA.length >= 6 && nameB.length >= 6 &&
+    nameA.substring(0, 6) === nameB.substring(0, 6)
+  ) return true;
+
+  // 条件3: 片方のlocationがもう片方のnameに含まれる + 部分名前一致（先頭6文字）
+  if (a.location && nameB.includes(normalizeName(a.location)) &&
+      nameA.length >= 6 && nameB.length >= 6 &&
+      nameA.substring(0, 6) === nameB.substring(0, 6)) return true;
+  if (b.location && nameA.includes(normalizeName(b.location)) &&
+      nameA.length >= 6 && nameB.length >= 6 &&
+      nameA.substring(0, 6) === nameB.substring(0, 6)) return true;
+
+  // 条件4: 末尾の場所を除去 + コネクタ正規化して比較
+  // 「第77回函館市中学校陸上競技大会兼第74回渡島中学校陸上競技大会　千代台」vs
+  // 「第77回函館市中学校陸上競技大会・第74回渡島中学校陸上競技大会」→ 一致
+  const coreA = normalizeForDedup(a.name.replace(/[\s\u3000]+[^\s\u3000]+$/, ""));
+  const coreB = normalizeForDedup(b.name.replace(/[\s\u3000]+[^\s\u3000]+$/, ""));
+  if (coreA.length >= 8 && coreB.length >= 8) {
+    const coreShorter = coreA.length <= coreB.length ? coreA : coreB;
+    const coreLonger = coreA.length <= coreB.length ? coreB : coreA;
+    if (coreLonger.includes(coreShorter) &&
+        coreShorter.length / coreLonger.length >= 0.5) return true;
+  }
+
+  // 条件5: 長い共通プレフィックス（同じ大会名 + 異なる場所表記）
+  // 「道北記録会第3戦花咲スポーツ公園(陸)」vs「道北記録会第3戦旭川」→ prefix 80%
+  let prefixLen = 0;
+  while (prefixLen < nameA.length && prefixLen < nameB.length &&
+         nameA[prefixLen] === nameB[prefixLen]) prefixLen++;
+  const shorterLen = Math.min(nameA.length, nameB.length);
+  if (prefixLen >= 8 && prefixLen / shorterLen >= 0.7) return true;
+
+  // 条件6: 地域名による短縮名マッチ
+  // muroriku「記録会第2戦」vs hokkaido「室蘭地方陸上競技記録会第2戦」のように
+  // 短い名前が相手に包含され、かつ相手の名前にこちらの地域名が含まれていれば重複
+  const regionA = REGION_KEYWORDS[a.sourceId];
+  const regionB = REGION_KEYWORDS[b.sourceId];
+  if (shorter.length >= 5 && longer.includes(shorter)) {
+    // 短い方のsourceIdの地域名が、長い方の名前に含まれているか
+    const shorterRegion = nameA.length <= nameB.length ? regionA : regionB;
+    if (shorterRegion && shorterRegion.some((kw) => longer.includes(kw))) return true;
+  }
+
+  return false;
+}
+
+/**
+ * siteConfigsのnameから地域キーワードを自動生成
+ * 「室蘭地方陸上競技協会」→「室蘭」、「小樽後志陸上競技協会」→「小樽後志」
+ * hokkaido/runnet等の全国系サイトは除外（地域名なし）
+ */
+const REGION_KEYWORDS: Record<string, string[] | undefined> = Object.fromEntries(
+  siteConfigs
+    .filter((c) => !["hokkaido", "runnet", "chuutairen", "koutairen", "gakuren", "masters"].includes(c.id))
+    .map((c) => {
+      // 「室蘭地方陸上競技協会」→「室蘭」、「小樽後志陸上競技協会」→「小樽後志」
+      const region = c.name.replace(/(地方|陸上|陸協).*$/, "").trim();
+      return [c.id, region ? [region] : undefined];
+    })
+    .filter(([, v]) => v)
+);
+
+/**
+ * 重複判定用の深い正規化（コネクタ文字を除去）
+ */
+function normalizeForDedup(name: string): string {
+  return normalizeName(name)
+    .replace(/[兼・\/／]/g, "");
+}
+
+/**
+ * 情報の多い方をkeeper、少ない方をloserとして返す
+ */
+function pickKeeper(
+  a: { event: Event; result: ScrapeResult; index: number; removed: boolean },
+  b: { event: Event; result: ScrapeResult; index: number; removed: boolean }
+): [typeof a, typeof b] {
+  const scoreA = (a.event.disciplines.length * 10) +
+    (a.event.location ? 3 : 0) + (a.event.pdfSize ? 1 : 0);
+  const scoreB = (b.event.disciplines.length * 10) +
+    (b.event.location ? 3 : 0) + (b.event.pdfSize ? 1 : 0);
+  return scoreA >= scoreB ? [a, b] : [b, a];
+}
+
+/**
+ * loserの情報でkeeperの欠けているフィールドを補完する
+ */
+function mergeEventInfo(keeper: Event, loser: Event): void {
+  if (!keeper.location && loser.location) keeper.location = loser.location;
+  if (keeper.disciplines.length === 0 && loser.disciplines.length > 0)
+    keeper.disciplines = loser.disciplines;
+  if (!keeper.entryDeadline && loser.entryDeadline)
+    keeper.entryDeadline = loser.entryDeadline;
+  if (!keeper.pdfSize && loser.pdfSize) keeper.pdfSize = loser.pdfSize;
+  if (!keeper.note && loser.note) keeper.note = loser.note;
 }
