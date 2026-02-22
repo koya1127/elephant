@@ -742,33 +742,46 @@ async function parseHokkaido(
   const events: ScrapedEventRaw[] = [];
   const $ = cheerio.load(html);
 
-  // 1. HTMLから個別大会を取得（dl.web_guidelines構造）
-  $("dl.web_guidelines").each((_, el) => {
-    const dt = $(el).find("dt");
-    const name = dt.text().trim();
-    const dd = $(el).find("dd");
+  // 1. HTMLから個別大会を取得（h3 + dl構造）
+  $("h3").each((_, el) => {
+    const name = $(el).text().trim();
+    if (name.length < 5) return;
 
-    let prev = $(el).prev();
-    while (prev.length && !prev.is("h3")) {
-      prev = prev.prev();
-    }
-    const dateTextSource = prev.text().trim();
+    const dl = $(el).next("dl");
+    if (!dl.length) return;
 
+    // dt/dd ペアから日程・要項PDFを取得
+    let dateTextSource = "";
+    let pdfLink = "";
+    dl.find("dt").each((__, dt) => {
+      const dtText = $(dt).text().trim();
+      const dd = $(dt).next("dd");
+      if (!dd.length) return;
+      if (dtText === "日程") {
+        dateTextSource = dd.text().trim();
+      } else if (dtText === "要項") {
+        const href = dd.find("a[href$='.pdf']").first().attr("href");
+        if (href) pdfLink = href;
+      }
+    });
+
+    // 日付パース（YYYY年M月D日 形式）
     const dateMatch = dateTextSource.match(
-      /(\d{1,2})月(\d{1,2})日(?:[～~](\d{1,2})日)?/
+      /(\d{4})年(\d{1,2})月(\d{1,2})日/
     );
     if (!dateMatch) return;
 
-    const month = dateMatch[1].padStart(2, "0");
-    const day = dateMatch[2].padStart(2, "0");
-    const endDay = dateMatch[3] ? dateMatch[3].padStart(2, "0") : null;
+    const dateYear = dateMatch[1];
+    const month = dateMatch[2].padStart(2, "0");
+    const day = dateMatch[3].padStart(2, "0");
+
+    // 終了日（～D日 or ・D日）
+    const endMatch = dateTextSource.match(/[～~・](\d{1,2})日/);
+    const endDay = endMatch ? endMatch[1].padStart(2, "0") : null;
 
     const dateStr = endDay
-      ? `${year}-${month}-${day}~${year}-${month}-${endDay}`
-      : `${year}-${month}-${day}`;
-
-    const pdfLink = dd.find("a").filter((_, a) => $(a).text().includes("要項")).attr("href")
-      || dd.find("a[href$='.pdf']").attr("href");
+      ? `${dateYear}-${month}-${day}~${dateYear}-${month}-${endDay}`
+      : `${dateYear}-${month}-${day}`;
 
     const detailUrl = pdfLink
       ? new URL(pdfLink, config.url).toString()
