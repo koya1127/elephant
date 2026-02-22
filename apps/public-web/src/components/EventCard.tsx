@@ -75,6 +75,12 @@ export function EventCard({
                   上限 {stringify(event.maxEntries)}
                 </span>
               )}
+              {event.fee != null && (
+                <span className={styles.metaItem}>
+                  <span className={styles.metaIcon}>&#x1F4B0;</span>
+                  ¥{event.fee.toLocaleString()}
+                </span>
+              )}
               {event.entryDeadline && (
                 <span className={`${styles.metaItem} ${styles.deadline}`}>
                   <span className={styles.metaIcon}>&#x23F0;</span>
@@ -93,6 +99,7 @@ export function EventCard({
                 eventId={event.id}
                 eventDate={event.date}
                 disciplines={event.disciplines}
+                fee={event.fee}
               />
             )}
             {event.detailUrl && (

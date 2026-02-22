@@ -12,11 +12,12 @@ interface EntryButtonProps {
   eventId: string;
   eventDate: string;
   disciplines: Discipline[];
+  fee?: number;
 }
 
 type MemberStatus = "active" | "pending" | undefined;
 
-export function EntryButton({ eventName, eventId, eventDate, disciplines }: EntryButtonProps) {
+export function EntryButton({ eventName, eventId, eventDate, disciplines, fee }: EntryButtonProps) {
   const { user, isSignedIn, isLoaded } = useUser();
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
@@ -98,6 +99,7 @@ export function EntryButton({ eventName, eventId, eventDate, disciplines }: Entr
           eventName={eventName}
           eventDate={eventDate}
           disciplines={disciplines}
+          fee={fee}
           onClose={() => setShowModal(false)}
           onSuccess={() => {
             // Clerk のメタデータはリロードで反映されるが、

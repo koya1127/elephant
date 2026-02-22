@@ -10,17 +10,23 @@ interface EntryModalProps {
   eventName: string;
   eventDate: string;
   disciplines: Discipline[];
+  /** 参加費（設定済みの場合） */
+  fee?: number;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 type Step = "select" | "confirm" | "done";
 
+const SERVICE_FEE = 1500;
+const STRIPE_FEE_RATE = 0.036;
+
 export function EntryModal({
   eventId,
   eventName,
   eventDate,
   disciplines,
+  fee,
   onClose,
   onSuccess,
 }: EntryModalProps) {
@@ -58,10 +64,36 @@ export function EntryModal({
     });
   };
 
+  const requiresPayment = fee != null && fee > 0;
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setError("");
     try {
+      const discList = hasDisciplines
+        ? Array.from(selected)
+        : freeText.split(/[,、\s]+/).map((s) => s.trim()).filter(Boolean);
+
+      if (requiresPayment) {
+        // Stripe決済フロー
+        const res = await fetch("/api/stripe/entry-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventId,
+            eventName,
+            eventDate,
+            disciplines: discList,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "エラーが発生しました");
+        // Stripe Checkout に遷移
+        window.location.href = data.url;
+        return;
+      }
+
+      // 無料エントリー
       const res = await fetch("/api/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -69,9 +101,7 @@ export function EntryModal({
           eventId,
           eventName,
           eventDate,
-          disciplines: hasDisciplines
-            ? Array.from(selected)
-            : freeText.split(/[,、\s]+/).map((s) => s.trim()).filter(Boolean),
+          disciplines: discList,
         }),
       });
       const data = await res.json();
@@ -169,8 +199,30 @@ export function EntryModal({
                         </span>
                       ))}
               </div>
+              {requiresPayment && (
+                <div className={styles.feeBreakdown}>
+                  <div className={styles.feeRow}>
+                    <span>参加費</span>
+                    <span>¥{fee!.toLocaleString()}</span>
+                  </div>
+                  <div className={styles.feeRow}>
+                    <span>手数料</span>
+                    <span>¥{SERVICE_FEE.toLocaleString()}</span>
+                  </div>
+                  <div className={styles.feeRow}>
+                    <span>決済手数料</span>
+                    <span>¥{(Math.ceil((fee! + SERVICE_FEE) / (1 - STRIPE_FEE_RATE)) - fee! - SERVICE_FEE).toLocaleString()}</span>
+                  </div>
+                  <div className={`${styles.feeRow} ${styles.feeTotal}`}>
+                    <span>合計</span>
+                    <span>¥{Math.ceil((fee! + SERVICE_FEE) / (1 - STRIPE_FEE_RATE)).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
               <p className={styles.confirmNote}>
-                上記の種目でエントリーします。よろしいですか？
+                {requiresPayment
+                  ? "上記の種目と金額でエントリーします。「支払いへ進む」をクリックすると決済ページへ移動します。"
+                  : "上記の種目でエントリーします。よろしいですか？"}
               </p>
               {error && <p className={styles.error}>{error}</p>}
             </>
@@ -221,7 +273,11 @@ export function EntryModal({
                 onClick={handleSubmit}
                 disabled={submitting}
               >
-                {submitting ? "送信中..." : "エントリーする"}
+                {submitting
+                  ? "送信中..."
+                  : requiresPayment
+                    ? "支払いへ進む"
+                    : "エントリーする"}
               </button>
             </>
           )}
