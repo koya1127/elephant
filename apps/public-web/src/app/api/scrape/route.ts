@@ -237,7 +237,8 @@ function normalizeName(name: string): string {
   return name
     .replace(/[\s\u3000]+/g, "")
     .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
-    .replace(/[Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+    .replace(/[Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/^20\d{2}/, ""); // 先頭の年号を除去（「2025苫小牧記録会」→「苫小牧記録会」）
 }
 
 /**
