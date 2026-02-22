@@ -797,7 +797,7 @@ async function parseHokkaido(
       || dd.find("a[href$='.pdf']").attr("href");
 
     const detailUrl = pdfLink
-      ? new URL(pdfLink, config.baseUrl).toString()
+      ? new URL(pdfLink, config.url).toString()
       : config.url;
 
     events.push({
@@ -1173,16 +1173,86 @@ async function parseDohoku(
     const pdfBuffer = await downloadPdf(pdfUrl);
     const pdfEvents = await parseSchedulePdfWithClaude(pdfBuffer);
     console.log(`[Dohoku] Claude extracted ${pdfEvents.length} events`);
-    return pdfEvents.map((pe) => ({
+
+    const events = pdfEvents.map((pe) => ({
       name: pe.location ? `${pe.name}　${pe.location}` : pe.name,
       dateText: pe.dateEnd ? `${pe.date}~${pe.dateEnd}` : pe.date,
       pdfUrl,
       detailUrl: pdfUrl!,
     }));
+
+    // 要項ページから個別PDFリンクを取得してマッチング
+    if (config.guidelineUrl) {
+      const youkoMap = await fetchDohokuYoukoPdfs(config);
+      if (youkoMap.size > 0) {
+        let matched = 0;
+        for (const ev of events) {
+          // dateText "2025-04-29" or "2025-04-29~2025-04-30" → 開始日の "4-29"
+          const m = ev.dateText.match(/^\d{4}-(\d{1,2})-(\d{1,2})/);
+          if (!m) continue;
+          const key = `${parseInt(m[1])}-${parseInt(m[2])}`;
+          const youkoUrl = youkoMap.get(key);
+          if (youkoUrl) {
+            ev.pdfUrl = youkoUrl;
+            ev.detailUrl = youkoUrl;
+            matched++;
+          }
+        }
+        console.log(`[Dohoku] Matched ${matched}/${events.length} events with youko PDFs`);
+      }
+    }
+
+    return events;
   } catch (e) {
     console.error("[Dohoku] Failed to download/parse PDF:", e);
     return [];
   }
+}
+
+/** 道北 要項ページ(program.htm)から大会ごとの個別要項PDFリンクを取得 */
+async function fetchDohokuYoukoPdfs(
+  config: SiteConfig
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (!config.guidelineUrl) return map;
+
+  try {
+    const html = await fetchHtml(config.guidelineUrl, "shift_jis");
+    if (!html) return map;
+
+    const $ = cheerio.load(html);
+    const programBase = "https://cf139878.cloudfree.jp/program/";
+
+    $("table tr").each((_, tr) => {
+      const cells = $(tr).find("td");
+      if (cells.length < 3) return;
+
+      const dateRaw = $(cells[0]).text().trim();
+      const youkoLink = $(cells[2]).find('a[href$=".pdf"]').attr("href");
+      if (!dateRaw || !youkoLink) return;
+
+      // 全角数字→半角変換
+      const dateNorm = dateRaw.replace(/[０-９]/g, (ch) =>
+        String.fromCharCode(ch.charCodeAt(0) - 0xfee0)
+      );
+
+      // "5月10日", "8月23-24日", "10月　4日" などから月・開始日を抽出
+      const dm = dateNorm.match(/(\d{1,2})月\s*(\d{1,2})/);
+      if (!dm) return;
+
+      const key = `${parseInt(dm[1])}-${parseInt(dm[2])}`;
+      const fullUrl = youkoLink.startsWith("http")
+        ? youkoLink
+        : new URL(youkoLink, programBase).toString();
+      map.set(key, fullUrl);
+    });
+
+    console.log(`[Dohoku] Fetched ${map.size} youko PDFs from program.htm`);
+  } catch (e) {
+    console.warn("[Dohoku] Failed to fetch youko PDFs:", e);
+  }
+
+  return map;
 }
 
 /**
