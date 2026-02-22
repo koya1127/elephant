@@ -38,65 +38,32 @@ export default function MyPage() {
     );
   }
 
-  const meta = (user?.publicMetadata ?? {}) as Record<string, unknown>;
-  const memberStatus = meta?.memberStatus as string | undefined;
-  const planName = (meta?.planName as string) ?? null;
-  const entryLimit = (meta?.entryLimit as number) ?? 0;
-  const entriesUsed = (meta?.entriesUsed as number) ?? 0;
-  const remaining = Math.max(0, entryLimit - entriesUsed);
-  const pct = entryLimit > 0 ? Math.min(100, (entriesUsed / entryLimit) * 100) : 0;
-
   const sorted = [...entries].sort(
     (a, b) => b.createdAt.localeCompare(a.createdAt)
   );
+  const confirmedCount = entries.filter((e) => e.status === "submitted").length;
 
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>マイページ</h1>
 
-      {/* プラン情報カード */}
+      {/* エントリー概要カード */}
       <div className={styles.planCard}>
         <div className={styles.planHeader}>
           <span className={styles.planName}>
-            {planName ?? "未入会"}
+            {user?.firstName
+              ? `${user.lastName ?? ""} ${user.firstName}`.trim()
+              : "会員"}
           </span>
-          {memberStatus === "active" ? (
-            <span className={styles.planStatus}>Active</span>
-          ) : memberStatus === "pending" ? (
-            <span className={styles.planStatusPending}>お支払い待ち</span>
-          ) : (
-            <span className={styles.planStatusNone}>未入会</span>
-          )}
+          <span className={styles.planStatus}>
+            {confirmedCount}件エントリー済み
+          </span>
         </div>
-
-        {memberStatus === "active" && (
-          <div className={styles.progressSection}>
-            <div className={styles.progressLabel}>
-              <span>エントリー利用状況</span>
-              <span>{entriesUsed} / {entryLimit}</span>
-            </div>
-            <div className={styles.progressBar}>
-              <div
-                className={pct >= 80 ? styles.progressFillWarning : styles.progressFill}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <div className={styles.remaining}>
-              残り {remaining} 回エントリー可能
-            </div>
-          </div>
-        )}
-
-        {!memberStatus && (
-          <Link href="/join" className={styles.joinCta}>
-            入会する
+        <div style={{ marginTop: 12 }}>
+          <Link href="/events" className={styles.joinCta}>
+            大会一覧を見る
           </Link>
-        )}
-        {memberStatus === "pending" && (
-          <Link href="/join" className={styles.joinCta}>
-            お支払いを完了する
-          </Link>
-        )}
+        </div>
       </div>
 
       {/* エントリー履歴 */}
@@ -122,6 +89,16 @@ export default function MyPage() {
             )}
             <div className={styles.entryCreatedAt}>
               申込日: {new Date(e.createdAt).toLocaleDateString("ja-JP")}
+              {e.feePaid != null && (
+                <span style={{ marginLeft: 12 }}>
+                  支払額: ¥{(e.feePaid + (e.serviceFeePaid ?? 0)).toLocaleString()}
+                </span>
+              )}
+              {e.status === "pending_payment" && (
+                <span style={{ marginLeft: 8, color: "#d97706", fontWeight: 600 }}>
+                  決済待ち
+                </span>
+              )}
             </div>
           </div>
         ))
