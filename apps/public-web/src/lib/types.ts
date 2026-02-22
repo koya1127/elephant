@@ -77,6 +77,24 @@ export interface Entry {
   createdAt: string;
 }
 
+/** 施設情報（競技場マップ） */
+export type VenueType = "stadium" | "practice" | "powermax";
+
+export interface Venue {
+  id: string;
+  type: VenueType;
+  name: string;
+  description?: string | null;
+  address?: string | null;
+  lat: number;
+  lng: number;
+  keywords?: string[];
+  url?: string | null;
+  userId: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 /** スクレイピングで取得した大会の生データ（PDFリンク含む） */
 export interface ScrapedEventRaw {
   /** 大会名 */

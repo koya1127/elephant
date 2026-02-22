@@ -22,6 +22,7 @@
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.2.0",
     "@vercel/postgres": "^0.10.0",
+    "@vis.gl/react-google-maps": "^1.7.1",
     "cheerio": "^1.0.0",
     "drizzle-orm": "^0.45.1",
     "next": "16.1.4",
