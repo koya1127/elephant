@@ -77,6 +77,11 @@ export async function scrapeEvents(
     return parseDonan(html, effectiveConfig);
   }
 
+  // オホーツク: HTMLテーブル + 詳細ページからPDF取得
+  if (effectiveConfig.parser === "ork") {
+    return parseOrk(html, effectiveConfig);
+  }
+
   // 小樽後志: WordPress投稿一覧 → 個別投稿から日付・PDF取得
   if (effectiveConfig.parser === "osrk") {
     return parseOsrk(html, effectiveConfig);
@@ -160,6 +165,11 @@ export async function parseEventsFromHtml(
   // 北海道陸協はPDFパースロジックを含むため特別扱い
   if (config.parser === "hokkaido") {
     return parseHokkaido(html, config, noLlm);
+  }
+
+  // オホーツク: HTMLテーブル + 詳細ページからPDF取得
+  if (config.parser === "ork") {
+    return parseOrk(html, config);
   }
 
   const $ = cheerio.load(html);
@@ -628,49 +638,6 @@ export async function parseEventsFromHtml(
 
       events.push({ name, dateText: dateStr, detailUrl: config.url });
     }
-  } else if (config.parser === "ork") {
-    // オホーツク: HTMLテーブル（月|日|曜日|競技会名|開催地|関連ページ|結果）
-    // 年度はページヘッダーから取得
-    const pageText = $.text();
-    const yrMatch = pageText.match(/(\d{4})年度/);
-    const scheduleYear = yrMatch ? parseInt(yrMatch[1]) : year;
-
-    $("table").first().find("tbody tr").each((_, el) => {
-      const tds = $(el).find("td");
-      if (tds.length < 4) return;
-
-      const monthStr = $(tds[0]).text().trim();
-      const dayStr = $(tds[1]).text().trim();
-      const name = $(tds[3]).text().trim();
-      const location = tds.length > 4 ? $(tds[4]).text().trim().replace(/[\s　]+/g, "") : "";
-      const linkHref = tds.length > 5 ? $(tds[5]).find("a").attr("href") || "" : "";
-
-      if (!monthStr || !dayStr || !name) return;
-      const month = parseInt(monthStr);
-      const dayMatch2 = dayStr.match(/(\d+)/);
-      if (!month || !dayMatch2) return;
-
-      const monthPad = month.toString().padStart(2, "0");
-      const dayPad = parseInt(dayMatch2[1]).toString().padStart(2, "0");
-
-      // 複数日: "10～11"
-      const dayEndMatch = dayStr.match(/[～~]\s*(\d+)/);
-      const dateStr = dayEndMatch
-        ? `${scheduleYear}-${monthPad}-${dayPad}~${scheduleYear}-${monthPad}-${parseInt(dayEndMatch[1]).toString().padStart(2, "0")}`
-        : `${scheduleYear}-${monthPad}-${dayPad}`;
-
-      const detailUrl = linkHref
-        ? linkHref.startsWith("http")
-          ? linkHref
-          : new URL(linkHref, config.baseUrl).toString()
-        : config.url;
-
-      events.push({
-        name: location ? `${name}　${location}` : name,
-        dateText: dateStr,
-        detailUrl,
-      });
-    });
   }
 
   return events;
@@ -1271,6 +1238,92 @@ async function fetchDohokuYoukoPdfs(
   }
 
   return map;
+}
+
+/**
+ * オホーツク: HTMLテーブルから大会一覧取得 + 詳細ページから要項PDFリンク取得
+ */
+async function parseOrk(
+  html: string,
+  config: SiteConfig
+): Promise<ScrapedEventRaw[]> {
+  const $ = cheerio.load(html);
+  const year = new Date().getFullYear();
+  const events: ScrapedEventRaw[] = [];
+
+  // 年度はページヘッダーから取得
+  const pageText = $.text();
+  const yrMatch = pageText.match(/(\d{4})年度/);
+  const scheduleYear = yrMatch ? parseInt(yrMatch[1]) : year;
+
+  $("table").first().find("tbody tr").each((_, el) => {
+    const tds = $(el).find("td");
+    if (tds.length < 4) return;
+
+    const monthStr = $(tds[0]).text().trim();
+    const dayStr = $(tds[1]).text().trim();
+    const name = $(tds[3]).text().trim();
+    const location = tds.length > 4 ? $(tds[4]).text().trim().replace(/[\s　]+/g, "") : "";
+    const linkHref = tds.length > 5 ? $(tds[5]).find("a").attr("href") || "" : "";
+
+    if (!monthStr || !dayStr || !name) return;
+    const month = parseInt(monthStr);
+    const dayMatch2 = dayStr.match(/(\d+)/);
+    if (!month || !dayMatch2) return;
+
+    const monthPad = month.toString().padStart(2, "0");
+    const dayPad = parseInt(dayMatch2[1]).toString().padStart(2, "0");
+
+    // 複数日: "10～11"
+    const dayEndMatch = dayStr.match(/[～~]\s*(\d+)/);
+    const dateStr = dayEndMatch
+      ? `${scheduleYear}-${monthPad}-${dayPad}~${scheduleYear}-${monthPad}-${parseInt(dayEndMatch[1]).toString().padStart(2, "0")}`
+      : `${scheduleYear}-${monthPad}-${dayPad}`;
+
+    const detailUrl = linkHref
+      ? linkHref.startsWith("http")
+        ? linkHref
+        : new URL(linkHref, config.baseUrl).toString()
+      : config.url;
+
+    events.push({
+      name: location ? `${name}　${location}` : name,
+      dateText: dateStr,
+      detailUrl,
+    });
+  });
+
+  // 個別ページから要項PDFリンクを取得（3件並列）
+  const BATCH = 3;
+  for (let i = 0; i < events.length; i += BATCH) {
+    const batch = events.slice(i, i + BATCH);
+    await Promise.all(
+      batch.map(async (ev) => {
+        if (!ev.detailUrl || ev.detailUrl === config.url) return;
+        try {
+          const dHtml = await fetchHtml(ev.detailUrl);
+          const $d = cheerio.load(dHtml);
+          $d("a").each((_, a) => {
+            if (ev.pdfUrl) return;
+            const href = $d(a).attr("href") || "";
+            const text = $d(a).text().trim();
+            if (
+              href.endsWith(".pdf") &&
+              (text.includes("要項") || text.includes("開催要項"))
+            ) {
+              ev.pdfUrl = href.startsWith("http")
+                ? href
+                : new URL(href, config.baseUrl).toString();
+            }
+          });
+        } catch {
+          // 詳細ページ取得失敗は無視
+        }
+      })
+    );
+  }
+
+  return events;
 }
 
 /**
