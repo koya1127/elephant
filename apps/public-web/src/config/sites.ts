@@ -232,6 +232,7 @@ export const dohokuConfig: SiteConfig = {
   name: "道北陸上競技協会",
   url: "https://cf139878.cloudfree.jp/schedule/schedule.htm",
   baseUrl: "https://cf139878.cloudfree.jp/schedule/",
+  guidelineUrl: "https://cf139878.cloudfree.jp/program/program.htm",
   parser: "dohoku",
   selectors: {
     eventRow: "",
