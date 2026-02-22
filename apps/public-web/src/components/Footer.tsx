@@ -24,6 +24,16 @@ export function Footer() {
                   ホーム
                 </Link>
               </li>
+              <li>
+                <Link href="/events" className="hover:text-orange-500 transition-colors">
+                  大会スケジュール
+                </Link>
+              </li>
+              <li>
+                <Link href="/join" className="hover:text-orange-500 transition-colors">
+                  エントリー方法
+                </Link>
+              </li>
             </ul>
           </div>
 

@@ -12,11 +12,36 @@ const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
 export const metadata: Metadata = {
-  title: "エレファント陸上クラブ",
-  description: "走る楽しさを、すべての人に。初心者からベテランまで歓迎する陸上クラブです。",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "エレファント陸上クラブ",
+    template: "%s | エレファント陸上クラブ",
+  },
+  description:
+    "北海道限定の陸上大会エントリー代行クラブ。大会申込の面倒な手続きをすべて代行します。",
   verification: {
     google: "8L403oHgq7VfT-c-5rq7WF6oUV0kVk3EfwXWx-CYoBI",
+  },
+  openGraph: {
+    type: "website",
+    locale: "ja_JP",
+    siteName: "エレファント陸上クラブ",
+    title: "エレファント陸上クラブ",
+    description:
+      "北海道限定の陸上大会エントリー代行クラブ。大会申込の面倒な手続きをすべて代行します。",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "エレファント陸上クラブ",
+    description:
+      "北海道限定の陸上大会エントリー代行クラブ。大会申込の面倒な手続きをすべて代行します。",
   },
 };
 
