@@ -6,7 +6,16 @@ import type { Entry } from "@/lib/types";
 import { SOURCE_LABELS, EXTERNAL_SITE_IDS } from "@/config/sites";
 import styles from "./page.module.css";
 
-type Tab = "entries" | "members" | "scrape" | "fees";
+async function safeJson(res: Response) {
+  const text = await res.text();
+  try {
+    return { data: JSON.parse(text) as Record<string, unknown> };
+  } catch {
+    return { data: {} as Record<string, unknown>, textError: text.slice(0, 200) };
+  }
+}
+
+type Tab = "entries" | "members" | "scrape" | "fees" | "data";
 
 interface Member {
   id: string;
@@ -57,12 +66,19 @@ export default function AdminPage() {
         >
           参加費
         </button>
+        <button
+          className={tab === "data" ? styles.tabActive : styles.tab}
+          onClick={() => setTab("data")}
+        >
+          データ
+        </button>
       </div>
 
       {tab === "entries" && <EntriesTab />}
       {tab === "members" && <MembersTab />}
       {tab === "scrape" && <ScrapeTab />}
       {tab === "fees" && <FeesTab />}
+      {tab === "data" && <DataTab />}
     </div>
   );
 }
@@ -75,8 +91,8 @@ function EntriesTab() {
 
   useEffect(() => {
     fetch("/api/admin/entries")
-      .then((r) => r.json())
-      .then((d) => setEntries(d.entries ?? []))
+      .then((r) => safeJson(r))
+      .then(({ data }) => setEntries((data.entries as Entry[]) ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -149,8 +165,8 @@ function MembersTab() {
 
   useEffect(() => {
     fetch("/api/admin/members")
-      .then((r) => r.json())
-      .then((d) => setMembers(d.members ?? []))
+      .then((r) => safeJson(r))
+      .then(({ data }) => setMembers((data.members as Member[]) ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -275,8 +291,8 @@ function ScrapeTab() {
 
   useEffect(() => {
     fetch("/api/admin/health")
-      .then((r) => r.json())
-      .then((d) => setHealth(d.results ?? []))
+      .then((r) => safeJson(r))
+      .then(({ data }) => setHealth((data.results as HealthResult[]) ?? []))
       .catch(() => {})
       .finally(() => setHealthLoading(false));
   }, []);
@@ -289,9 +305,9 @@ function ScrapeTab() {
         method: "POST",
         signal: AbortSignal.timeout(120_000),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "失敗");
-      setHealth(data.results ?? []);
+      const { data, textError } = await safeJson(res);
+      if (!res.ok) throw new Error((data.error as string) || textError || "失敗");
+      setHealth((data.results as HealthResult[]) ?? []);
     } catch (err) {
       setError(`健康診断エラー: ${String(err)}`);
     } finally {
@@ -310,9 +326,10 @@ function ScrapeTab() {
         method: "POST",
         signal: AbortSignal.timeout(300_000),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "失敗");
-      const count = data.results?.[0]?.events?.length ?? 0;
+      const { data, textError } = await safeJson(res);
+      if (!res.ok) throw new Error((data.error as string) || textError || "失敗");
+      const results = data.results as Array<{ events?: unknown[] }> | undefined;
+      const count = results?.[0]?.events?.length ?? 0;
       setScrapingSites((prev) => ({ ...prev, [siteId]: `${count}件 OK` }));
     } catch (err) {
       setScrapingSites((prev) => ({ ...prev, [siteId]: `エラー` }));
@@ -537,8 +554,8 @@ function FeesTab() {
     setLoading(true);
     const params = f !== "all" ? `?filter=${f}` : "";
     fetch(`/api/admin/events${params}`)
-      .then((r) => r.json())
-      .then((d) => setEvents(d.events ?? []))
+      .then((r) => safeJson(r))
+      .then(({ data }) => setEvents((data.events as FeeEvent[]) ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -613,8 +630,8 @@ function FeesTab() {
     <>
       <div className={styles.filterRow}>
         {([
-          { key: "all" as const, label: "すべて" },
           { key: "upcoming" as const, label: "今後の大会" },
+          { key: "all" as const, label: "すべて" },
           { key: "unset" as const, label: "参加費未設定" },
           { key: "no-actual" as const, label: "実績未入力" },
         ]).map((f) => (
@@ -741,6 +758,253 @@ function FeesTab() {
                 </tr>
               );
             })}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
+/* ========== データタブ ========== */
+interface DataEvent {
+  id: string;
+  name: string;
+  date: string;
+  location: string;
+  sourceId: string;
+  note: string | null;
+}
+
+type DataFilter = "upcoming" | "all";
+
+function DataTab() {
+  const [events, setEvents] = useState<DataEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<DataFilter>("upcoming");
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editField, setEditField] = useState<keyof Pick<DataEvent, "name" | "date" | "location" | "note">>("name");
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEvents = (f: DataFilter) => {
+    setLoading(true);
+    const params = f === "upcoming" ? "?filter=upcoming" : "";
+    fetch(`/api/admin/events${params}`)
+      .then((r) => safeJson(r))
+      .then(({ data }) => setEvents((data.events as DataEvent[]) ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchEvents(filter);
+  }, [filter]);
+
+  const filtered = useMemo(() => {
+    if (!search) return events;
+    const q = search.toLowerCase();
+    return events.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.sourceId.toLowerCase().includes(q) ||
+        (e.location ?? "").toLowerCase().includes(q)
+    );
+  }, [events, search]);
+
+  const startEdit = (id: string, field: typeof editField, current: string | null) => {
+    setEditingId(id);
+    setEditField(field);
+    setEditValue(current ?? "");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValue("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const body: Record<string, string | null> = {};
+      body[editField] = editValue.trim() || null;
+      const res = await fetch(`/api/admin/events/${editingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const { data, textError } = await safeJson(res);
+      if (!res.ok) throw new Error((data.error as string) || textError || "保存に失敗しました");
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === editingId ? { ...e, [editField]: editValue.trim() || null } : e
+        )
+      );
+      cancelEdit();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`「${name}」を削除しますか？`)) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/events/${id}`, { method: "DELETE" });
+      const { data, textError } = await safeJson(res);
+      if (!res.ok) throw new Error((data.error as string) || textError || "削除に失敗しました");
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") saveEdit();
+    if (e.key === "Escape") cancelEdit();
+  };
+
+  if (loading) return <div className={styles.loading}>読み込み中...</div>;
+
+  return (
+    <>
+      {error && <div className={styles.error}>{error}</div>}
+      <div className={styles.filterRow}>
+        {([
+          { key: "upcoming" as const, label: "今後の大会" },
+          { key: "all" as const, label: "すべて" },
+        ]).map((f) => (
+          <button
+            key={f.key}
+            className={filter === f.key ? styles.filterChipActive : styles.filterChip}
+            onClick={() => setFilter(f.key)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div className={styles.searchBar}>
+        <input
+          className={styles.searchInput}
+          placeholder="大会名・会場・ソースで検索..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      {filtered.length === 0 ? (
+        <div className={styles.empty}>該当するイベントはありません</div>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>大会名</th>
+              <th>日付</th>
+              <th>会場</th>
+              <th>ソース</th>
+              <th>備考</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((e) => (
+              <tr key={e.id}>
+                <td
+                  className={styles.editableCell}
+                  onClick={() => startEdit(e.id, "name", e.name)}
+                >
+                  {editingId === e.id && editField === "name" ? (
+                    <input
+                      className={styles.inlineInputWide}
+                      value={editValue}
+                      onChange={(ev) => setEditValue(ev.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onBlur={saveEdit}
+                      disabled={saving}
+                      autoFocus
+                    />
+                  ) : (
+                    e.name
+                  )}
+                </td>
+                <td
+                  className={styles.editableCell}
+                  onClick={() => startEdit(e.id, "date", e.date)}
+                >
+                  {editingId === e.id && editField === "date" ? (
+                    <input
+                      className={styles.inlineInput}
+                      type="date"
+                      value={editValue}
+                      onChange={(ev) => setEditValue(ev.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onBlur={saveEdit}
+                      disabled={saving}
+                      autoFocus
+                    />
+                  ) : (
+                    <span style={{ whiteSpace: "nowrap" }}>{e.date}</span>
+                  )}
+                </td>
+                <td
+                  className={styles.editableCell}
+                  onClick={() => startEdit(e.id, "location", e.location)}
+                >
+                  {editingId === e.id && editField === "location" ? (
+                    <input
+                      className={styles.inlineInputWide}
+                      value={editValue}
+                      onChange={(ev) => setEditValue(ev.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onBlur={saveEdit}
+                      disabled={saving}
+                      autoFocus
+                    />
+                  ) : (
+                    <span style={{ color: e.location ? undefined : "#cbd5e1" }}>
+                      {e.location || "―"}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  <span style={{ fontSize: 11, color: "#64748b" }}>
+                    {SOURCE_LABELS[e.sourceId]?.short ?? e.sourceId}
+                  </span>
+                </td>
+                <td
+                  className={styles.editableCell}
+                  onClick={() => startEdit(e.id, "note", e.note)}
+                >
+                  {editingId === e.id && editField === "note" ? (
+                    <input
+                      className={styles.inlineInputWide}
+                      value={editValue}
+                      onChange={(ev) => setEditValue(ev.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onBlur={saveEdit}
+                      disabled={saving}
+                      autoFocus
+                    />
+                  ) : (
+                    <span style={{ color: e.note ? undefined : "#cbd5e1", fontSize: 12 }}>
+                      {e.note || "―"}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  <button
+                    className={styles.btnSmallDanger}
+                    onClick={() => handleDelete(e.id, e.name)}
+                  >
+                    削除
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}

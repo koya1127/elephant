@@ -437,6 +437,23 @@
   color: #16a34a;
 }
 
+.btnSmallDanger {
+  composes: btnSmall;
+  background: #fff;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.btnSmallDanger:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+.inlineInputWide {
+  composes: inlineInput;
+  width: 200px;
+}
+
 /* --- Responsive --- */
 @media (max-width: 600px) {
   .container {

@@ -35,6 +35,7 @@ export async function GET(request: Request) {
     fee: row.fee,
     actualFee: row.actualFee,
     feeSource: row.feeSource,
+    note: row.note,
     disciplines: row.disciplines as Discipline[],
   }));
 
