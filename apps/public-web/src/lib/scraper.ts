@@ -458,6 +458,15 @@ export async function parseEventsFromHtml(
         candidates.push(text);
       }
     });
+    // 候補テキスト内の "YYYY年度" から年を決定（HTML全体のノイズに左右されないよう大会名を優先）
+    let gakurenYear = year;
+    for (const c of candidates) {
+      const ym = c.match(/(\d{4})年度/);
+      if (ym) {
+        gakurenYear = parseInt(ym[1], 10);
+        break;
+      }
+    }
     for (const trimmed of candidates) {
       // "M/D(曜)" or "M/D(曜)～M/D(曜)" or "M/D(曜)～D(曜)" のパターン
       // \s* で日付直後にスペースなしのケースにも対応
@@ -469,14 +478,15 @@ export async function parseEventsFromHtml(
         const day = match[2].padStart(2, "0");
         const endMonth = match[3] ? match[3].padStart(2, "0") : null;
         const endDay = match[4] ? match[4].padStart(2, "0") : null;
-        const name = match[5].trim();
-        // location部分から「エントリー期間」「大会ページ」以降のゴミを除去
+        // 「兼」以降は別大会名の連結なので切り捨て
+        const name = match[5].trim().replace(/\s*兼\s*.*$/, "").trim();
+        // location部分から「エントリー期間」「大会ページ」「・要項」以降のゴミを除去
         let location = match[6] ? match[6].trim() : "";
-        location = location.replace(/(エントリー|大会ページ).*$/, "").trim();
+        location = location.replace(/(エントリー|大会ページ|・要項|・競技).*$/, "").trim();
 
         const dateStr = endDay
-          ? `${year}-${month}-${day}~${year}-${endMonth || month}-${endDay}`
-          : `${year}-${month}-${day}`;
+          ? `${gakurenYear}-${month}-${day}~${gakurenYear}-${endMonth || month}-${endDay}`
+          : `${gakurenYear}-${month}-${day}`;
 
         events.push({
           name: location ? `${name}　${location}` : name,
