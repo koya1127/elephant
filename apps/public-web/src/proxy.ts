@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkClient, clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 // API routes are handled by their own auth (admin key, Clerk, etc.)
@@ -15,7 +15,7 @@ export default clerkMiddleware(async (auth, req) => {
   if (isApiRoute(req)) return;
 
   // All other routes: require admin
-  const { userId, sessionClaims } = await auth();
+  const { userId } = await auth();
 
   if (!userId) {
     // Not logged in → redirect to sign-in
@@ -24,8 +24,10 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  const role = (sessionClaims?.publicMetadata as Record<string, unknown>)
-    ?.role;
+  // sessionClaimsにはpublicMetadataが含まれないため、APIから直接取得
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
+  const role = (user.publicMetadata as Record<string, unknown>)?.role;
   if (role !== "admin") {
     // Logged in but not admin → show maintenance page
     const url = new URL("/maintenance", req.url);
