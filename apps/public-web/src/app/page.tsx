@@ -34,6 +34,10 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      {/* Maintenance Banner */}
+      <div className="bg-yellow-400 text-yellow-900 py-3 text-center font-bold text-sm">
+        &#128679; このサイトは現在準備中です（管理者プレビュー）
+      </div>
       {/* Hero */}
       <div className="bg-orange-500 text-white py-12 mb-12 text-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
