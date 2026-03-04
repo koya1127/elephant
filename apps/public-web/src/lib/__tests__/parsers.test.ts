@@ -280,6 +280,48 @@ describe("gakuren parser", () => {
     expect(events).toHaveLength(1);
     expect(events[0].dateText).toBe("2025-06-15~2025-06-16");
   });
+
+  it("「YYYY年度」テキストから年を自動検出して日付に使う", async () => {
+    // effectiveYear を渡さず、イベント名の "2025年度" から年を検出させる
+    const html = `<html><body>
+      <p>5/6(火) 2025年度北海道学連競技会第1戦 ＠円山公園陸上競技場</p>
+    </body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...gakurenConfig,
+      effectiveYear: 2026, // 誤った年が渡されても候補テキスト内の年度で上書きされる
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-05-06");
+  });
+
+  it("「兼」で結合された長い大会名を最初の大会名のみに切り捨てる", async () => {
+    const html = `<html><body>
+      <p>8/16(土)北海道知事杯第37回北海道大学駅伝対校選手権大会　兼　秩父宮賜杯第57回全日本大学駅伝対校選手権大会北海道地区選考会 ＠真駒内セキスイハイムスタジアム</p>
+    </body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...gakurenConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].name).toBe("北海道知事杯第37回北海道大学駅伝対校選手権大会　真駒内セキスイハイムスタジアム");
+    expect(events[0].name).not.toContain("兼");
+  });
+
+  it("エントリー期間の日付（4/6(日)等）をイベントとして誤取得しない", async () => {
+    // 実際のページ形式: 大会名行にエントリー期間の日付が混在する
+    const html = `<html><body>
+      <p>2025年度北海道学連競技会第1戦　＠円山公園陸上競技場エントリー期間：4/6(日)～4/19(土)大会ページ：AthleteRanking・要項</p>
+      <p>5/6(火)　2025年度北海道学連競技会第2戦　＠円山公園陸上競技場エントリー期間：4/6(日)～4/19(土)大会ページ：AthleteRanking・要項</p>
+    </body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...gakurenConfig,
+      effectiveYear: YEAR,
+    });
+    // エントリー期間の4/6はイベントにならず、5/6の第2戦のみ取得される
+    expect(events).toHaveLength(1);
+    expect(events[0].dateText).toBe("2025-05-06");
+    expect(events[0].name).toContain("北海道学連競技会第2戦");
+  });
 });
 
 // ---------------------------------------------------------------
