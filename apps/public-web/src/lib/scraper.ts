@@ -471,7 +471,7 @@ export async function parseEventsFromHtml(
       // "M/D(曜)" or "M/D(曜)～M/D(曜)" or "M/D(曜)～D(曜)" のパターン
       // \s* で日付直後にスペースなしのケースにも対応
       const match = trimmed.match(
-        /^(\d{1,2})\/(\d{1,2})\([日月火水木金土]\)(?:\s*[～~]\s*(?:(\d{1,2})\/)?(\d{1,2})\([日月火水木金土]\))?\s*(.+?)(?:\s+[＠@](.+))?$/
+        /^(\d{1,2})\/(\d{1,2})\([日月火水木金土]\)(?:\s*[～~]\s*(?:(\d{1,2})\/)?(\d{1,2})\([日月火水木金土]\))?\s*(.+?)(?:\s*[＠@](.+))?$/
       );
       if (match) {
         const month = match[1].padStart(2, "0");
@@ -482,7 +482,7 @@ export async function parseEventsFromHtml(
         const name = match[5].trim().replace(/\s*兼\s*.*$/, "").trim();
         // location部分から「エントリー期間」「大会ページ」「・要項」以降のゴミを除去
         let location = match[6] ? match[6].trim() : "";
-        location = location.replace(/(エントリー|大会ページ|・要項|・競技).*$/, "").trim();
+        location = location.replace(/(エントリー|大会ページ|AthleteRanking|・).*$/, "").trim();
 
         const dateStr = endDay
           ? `${gakurenYear}-${month}-${day}~${gakurenYear}-${endMonth || month}-${endDay}`
