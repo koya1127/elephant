@@ -273,25 +273,51 @@
   margin-top: 2px;
 }
 
-/* --- Last year reference sub-header (within a month section) --- */
-.referenceSubHeader {
+/* --- Last year reference collapsible --- */
+.referenceCollapsible {
+  margin-top: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.referenceSummary {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 16px 0 12px;
-  margin-top: 8px;
-  border-top: 1px dashed #e7e5e4;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #fffbeb;
+  border: 1px dashed #fde68a;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+  list-style: none;
 }
 
-.referenceSubTitle {
-  font-size: 12px;
-  font-weight: 700;
+.referenceSummary::-webkit-details-marker {
+  display: none;
+}
+
+.referenceSummary::before {
+  content: "▶";
+  font-size: 9px;
   color: #d97706;
+  transition: transform 0.2s;
 }
 
-.referenceSubText {
-  font-size: 11px;
-  color: #a8a29e;
+.referenceCollapsible[open] > .referenceSummary::before {
+  transform: rotate(90deg);
+}
+
+.referenceSummary:hover {
+  background: #fef3c7;
+}
+
+.referenceContent {
+  padding-top: 12px;
 }
 
 .empty {
