@@ -1,41 +1,8 @@
-import { clerkClient, clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
-// API routes are handled by their own auth (admin key, Clerk, etc.)
-const isApiRoute = createRouteMatcher(["/api(.*)"]);
-
-// Clerk sign-in/sign-up pages must be accessible
-const isAuthPage = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
-
-export default clerkMiddleware(async (auth, req) => {
-  // Allow Clerk auth pages
-  if (isAuthPage(req)) return;
-
-  // API routes have their own auth — pass through
-  if (isApiRoute(req)) return;
-
-  // All other routes: require admin
-  const { userId } = await auth();
-
-  if (!userId) {
-    // Not logged in → redirect to sign-in
-    const signInUrl = new URL("/sign-in", req.url);
-    signInUrl.searchParams.set("redirect_url", req.url);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  // sessionClaimsにはpublicMetadataが含まれないため、APIから直接取得
-  const client = await clerkClient();
-  const user = await client.users.getUser(userId);
-  const role = (user.publicMetadata as Record<string, unknown>)?.role;
-  if (role !== "admin") {
-    // Logged in but not admin → show maintenance page
-    const url = new URL("/maintenance", req.url);
-    if (req.nextUrl.pathname !== "/maintenance") {
-      return NextResponse.rewrite(url);
-    }
-  }
-});
+// サイトは全ページ公開。エントリー（決済）関連のみ準備中。
+// ブロックはEntryButton UI + API側で実施。
+export default clerkMiddleware();
 
 export const config = {
   matcher: [
