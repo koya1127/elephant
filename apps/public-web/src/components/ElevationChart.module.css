@@ -1,0 +1,32 @@
+.container {
+  width: 100%;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+}
+
+.gridLine {
+  stroke: #e5e7eb;
+  stroke-width: 0.5;
+  stroke-dasharray: 2 2;
+}
+
+.area {
+  fill: rgba(34, 197, 94, 0.15);
+}
+
+.line {
+  stroke: #22c55e;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.axisLabel {
+  font-size: 8px;
+  fill: #9ca3af;
+}
