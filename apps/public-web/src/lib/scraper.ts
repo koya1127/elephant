@@ -1042,11 +1042,16 @@ async function parseMasters(
         // 大会名に関連するキーワードがあるかチェック
         if (!text.match(/大会|記録会|選手権|競技会/)) return;
 
-        // プログラム告知・要項アップ通知はスキップ（大会情報ではない）
-        if (text.match(/プログラムです[。！!]?$|プログラム抜粋|にて.*実施します/)) return;
+        // プログラム告知・要項アップ通知・リザルトはスキップ
+        if (text.match(/プログラムです[。！!]?$|プログラム抜粋|にて.*実施します|リザルト/)) return;
 
         const month = dateInTitle[1].padStart(2, "0");
         const day = dateInTitle[2].padStart(2, "0");
+
+        // 投稿日から年を取得（NEWSBox4Dayに "YYYY-MM-DD" 形式）
+        const postDate = $n(el).find(".NEWSBox4Day").text().trim();
+        const postYearMatch = postDate.match(/^(\d{4})/);
+        const newsYear = postYearMatch ? parseInt(postYearMatch[1], 10) : year;
 
         // リンクからPDFを探す
         const newsLink = $n(el).parent("a").attr("href");
@@ -1055,8 +1060,9 @@ async function parseMasters(
           : config.url;
 
         // 大会名を抽出（日付部分・ゴミを除去）
+        // 曜日あり/なし両方に対応: "6月1日開催" "7月21日（月・祝）開催！"
         let name = text
-          .replace(/(\d+)月(\d+)日[（(][日月火水木金土・祝]+[）)]\s*開催\s*/, "")
+          .replace(/(\d+)月(\d+)日(?:[（(][日月火水木金土・祝]+[）)])?\s*開催[！!]?\s*/, "")
           .replace(/要[項綱].*$/, "")
           .replace(/をアップ.*$/, "")
           .replace(/の要項$/, "")
@@ -1069,12 +1075,12 @@ async function parseMasters(
         const nameNorm = name.replace(/\s+/g, "").replace(/第\d+回/, "");
         const exists = events.some(e => {
           const eNorm = e.name.replace(/\s+/g, "").replace(/第\d+回/, "");
-          return e.dateText === `${year}-${month}-${day}` || nameNorm.includes(eNorm.substring(0, 6)) || eNorm.includes(nameNorm.substring(0, 6));
+          return e.dateText === `${newsYear}-${month}-${day}` || nameNorm.includes(eNorm.substring(0, 6)) || eNorm.includes(nameNorm.substring(0, 6));
         });
         if (!exists) {
           events.push({
             name,
-            dateText: `${year}-${month}-${day}`,
+            dateText: `${newsYear}-${month}-${day}`,
             detailUrl,
           });
         }
