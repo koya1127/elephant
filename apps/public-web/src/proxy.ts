@@ -1,11 +1,8 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-// API routes that need to work without auth (webhooks, cron, etc.)
-const isPublicApi = createRouteMatcher([
-  "/api/stripe/webhook",
-  "/api/admin/health",
-]);
+// API routes are handled by their own auth (admin key, Clerk, etc.)
+const isApiRoute = createRouteMatcher(["/api(.*)"]);
 
 // Clerk sign-in/sign-up pages must be accessible
 const isAuthPage = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
@@ -14,8 +11,8 @@ export default clerkMiddleware(async (auth, req) => {
   // Allow Clerk auth pages
   if (isAuthPage(req)) return;
 
-  // Allow public API routes (webhooks, cron)
-  if (isPublicApi(req)) return;
+  // API routes have their own auth — pass through
+  if (isApiRoute(req)) return;
 
   // All other routes: require admin
   const { userId, sessionClaims } = await auth();
