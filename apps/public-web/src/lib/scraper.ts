@@ -1043,7 +1043,8 @@ async function parseMasters(
         if (!text.match(/大会|記録会|選手権|競技会/)) return;
 
         // プログラム告知・要項アップ通知・リザルトはスキップ
-        if (text.match(/プログラムです[。！!]?$|プログラム抜粋|にて.*実施します|リザルト/)) return;
+        // "プログラムです" "プログラムです！" は確実にスキップ、"プログラム抜粋" も
+        if (text.match(/プログラムです[。！!]?\s*$|プログラム抜粋|にて.*実施します|リザルト/)) return;
 
         const month = dateInTitle[1].padStart(2, "0");
         const day = dateInTitle[2].padStart(2, "0");
@@ -1060,22 +1061,25 @@ async function parseMasters(
           : config.url;
 
         // 大会名を抽出（日付部分・ゴミを除去）
-        // 曜日あり/なし両方に対応: "6月1日開催" "7月21日（月・祝）開催！"
+        // "6月1日開催" "7月21日（月・祝）開催！" "8月3日岩見沢開催" "7月21日 " (開催なし)
         let name = text
-          .replace(/(\d+)月(\d+)日(?:[（(][日月火水木金土・祝]+[）)])?\s*開催[！!]?\s*/, "")
+          .replace(/\d+月\d+日(?:[（(][日月火水木金土・祝]+[）)])?\s*(?:\S*開催[！!]?\s*)?/, "")
           .replace(/要[項綱].*$/, "")
           .replace(/をアップ.*$/, "")
           .replace(/の要項$/, "")
           .replace(/^！/, "")
           .replace(/の$/, "")
+          .replace(/\s*プログラム\s*$/, "")
           .trim();
         if (!name) name = text;
 
-        // 重複チェック（正規化して比較）
+        // 重複チェック（日付一致 or 正規化名完全一致）
+        // ※ 6-char部分文字列比較は "道マスターズ" が "北海道マスターズ" に誤マッチするため廃止
         const nameNorm = name.replace(/\s+/g, "").replace(/第\d+回/, "");
+        const dateStr = `${newsYear}-${month}-${day}`;
         const exists = events.some(e => {
           const eNorm = e.name.replace(/\s+/g, "").replace(/第\d+回/, "");
-          return e.dateText === `${newsYear}-${month}-${day}` || nameNorm.includes(eNorm.substring(0, 6)) || eNorm.includes(nameNorm.substring(0, 6));
+          return e.dateText === dateStr || nameNorm === eNorm;
         });
         if (!exists) {
           events.push({
