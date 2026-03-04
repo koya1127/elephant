@@ -84,6 +84,34 @@ export const venues = pgTable(
   (table) => [index("idx_venues_type").on(table.type)]
 );
 
+/** slopes テーブル（坂ダッシュマップ） */
+export const slopes = pgTable(
+  "slopes",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    latEnd: doublePrecision("lat_end").notNull(),
+    lngEnd: doublePrecision("lng_end").notNull(),
+    distance: doublePrecision("distance").notNull(),
+    elevationGain: doublePrecision("elevation_gain").notNull(),
+    gradient: doublePrecision("gradient").notNull(),
+    crossStreets: integer("cross_streets").default(0),
+    elevationProfile: jsonb("elevation_profile").default([]),
+    osmWayId: text("osm_way_id"),
+    source: text("source").notNull(), // "auto" | "manual"
+    userId: text("user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_slopes_source").on(table.source),
+    index("idx_slopes_osm_way_id").on(table.osmWayId),
+  ]
+);
+
 /** health_checks テーブル */
 export const healthChecks = pgTable(
   "health_checks",

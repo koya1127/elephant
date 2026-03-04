@@ -14,6 +14,7 @@ const navItems = [
   { href: "/", label: "ホーム" },
   { href: "/events", label: "大会一覧" },
   { href: "/venues", label: "競技場マップ" },
+  { href: "/slopes", label: "坂ダッシュ" },
 ];
 
 function isAdminUser(user: { publicMetadata: Record<string, unknown> }): boolean {

@@ -95,6 +95,33 @@ export interface Venue {
   updatedAt?: string;
 }
 
+/** 標高プロファイルの1点 */
+export interface ElevationPoint {
+  dist: number; // 距離(m)
+  elev: number; // 標高(m)
+}
+
+/** 坂ダッシュスポット */
+export interface Slope {
+  id: string;
+  name: string;
+  description?: string | null;
+  lat: number;
+  lng: number;
+  latEnd: number;
+  lngEnd: number;
+  distance: number; // 距離(m)
+  elevationGain: number; // 獲得標高(m)
+  gradient: number; // 勾配(%)
+  crossStreets: number;
+  elevationProfile: ElevationPoint[];
+  osmWayId?: string | null;
+  source: "auto" | "manual";
+  userId: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 /** スクレイピングで取得した大会の生データ（PDFリンク含む） */
 export interface ScrapedEventRaw {
   /** 大会名 */
