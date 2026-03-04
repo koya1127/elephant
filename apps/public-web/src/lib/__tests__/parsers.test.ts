@@ -295,8 +295,9 @@ describe("gakuren parser", () => {
   });
 
   it("「兼」で結合された長い大会名を最初の大会名のみに切り捨てる", async () => {
+    // 実際のページ: 半角@・スペースなし・複数「兼」・「・要項」付き
     const html = `<html><body>
-      <p>8/16(土)北海道知事杯第37回北海道大学駅伝対校選手権大会　兼　秩父宮賜杯第57回全日本大学駅伝対校選手権大会北海道地区選考会 ＠真駒内セキスイハイムスタジアム</p>
+      <p>8/16(土)北海道知事杯第37回北海道大学駅伝対校選手権大会　兼　秩父宮賜杯第57回全日本大学駅伝対校選手権大会北海道地区選考会北海道教育庁杯第32回北海道大学女子駅伝対校選手権大会　兼　第43回全日本大学女子駅伝対校選手権大会北海道地区選考会@真駒内セキスイハイムスタジアム・要項</p>
     </body></html>`;
     const events = await parseEventsFromHtml(html, {
       ...gakurenConfig,
@@ -305,6 +306,7 @@ describe("gakuren parser", () => {
     expect(events).toHaveLength(1);
     expect(events[0].name).toBe("北海道知事杯第37回北海道大学駅伝対校選手権大会　真駒内セキスイハイムスタジアム");
     expect(events[0].name).not.toContain("兼");
+    expect(events[0].name).not.toContain("要項");
   });
 
   it("エントリー期間の日付（4/6(日)等）をイベントとして誤取得しない", async () => {
@@ -321,6 +323,56 @@ describe("gakuren parser", () => {
     expect(events).toHaveLength(1);
     expect(events[0].dateText).toBe("2025-05-06");
     expect(events[0].name).toContain("北海道学連競技会第2戦");
+  });
+
+  it("location末尾の「・対校得点表」等のゴミを除去する", async () => {
+    const html = `<html><body>
+      <p>9/5(金)～7(日)北日本インカレ　＠円山公園陸上競技場・対校得点表</p>
+    </body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...gakurenConfig,
+      effectiveYear: YEAR,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].name).toBe("北日本インカレ　円山公園陸上競技場");
+    expect(events[0].dateText).toBe("2025-09-05~2025-09-07");
+  });
+
+  it("実際のページ全体から正しくイベントを抽出する", async () => {
+    const html = `<html><body>
+      <p>2025年度北海道学連競技会第1戦　＠円山公園陸上競技場エントリー期間：4/6(日)～4/19(土)大会ページ：AthleteRanking・要項・競技注意事項・タイムテーブル・競技役員名簿</p>
+      <p>5/3(土)　2025年度北海道学連競技会第1戦　＠円山公園陸上競技場エントリー期間：4/6(日)～4/19(土)大会ページ：AthleteRanking・要項・競技注意事項・タイムテーブル・競技役員名簿</p>
+      <p>5/6(火)　2025年度北海道学連競技会第2戦　＠円山公園陸上競技場エントリー期間：4/6(日)～4/19(土)大会ページ：AthleteRanking・要項・競技注意事項・タイムテーブル・競技役員名簿</p>
+      <p>5/16(金)～5/18(日)　第77回北海道学生陸上競技対校選手権大会　＠円山公園陸上競技場エントリー期間：4/20(日)～5/6(火)大会ページ：AthleteRanking・要項・種目振り分け</p>
+      <p>8/16(土)北海道知事杯第37回北海道大学駅伝対校選手権大会　兼　秩父宮賜杯第57回全日本大学駅伝対校選手権大会北海道地区選考会北海道教育庁杯第32回北海道大学女子駅伝対校選手権大会　兼　第43回全日本大学女子駅伝対校選手権大会北海道地区選考会@真駒内セキスイハイムスタジアム・要項</p>
+      <p>9/5(金)～7(日)北日本インカレ　＠円山公園陸上競技場・対校得点表</p>
+      <p>9/20(土)～9/21(日)第54回学生CH　＠円山公園陸上競技場大会ページ：AthleteRanking.com ver 2.0 ・要項・種目振り分け・タイムテーブル・競技注意事項・競技役員名簿</p>
+      <p>10/4(土)学連3戦　＠円山公園陸上競技場大会ページ：AthleteRanking.com ver 2.0 ・要項・タイムテーブル・競技注意事項・競技役員名簿</p>
+    </body></html>`;
+    const events = await parseEventsFromHtml(html, {
+      ...gakurenConfig,
+      effectiveYear: 2026, // 誤った年でも2025年度を自動検出
+    });
+    expect(events).toHaveLength(7);
+    // 全イベントが2025年
+    for (const e of events) {
+      expect(e.dateText).toMatch(/^2025-/);
+    }
+    // 第1戦
+    expect(events[0].name).toBe("2025年度北海道学連競技会第1戦　円山公園陸上競技場");
+    expect(events[0].dateText).toBe("2025-05-03");
+    // 第2戦
+    expect(events[1].name).toBe("2025年度北海道学連競技会第2戦　円山公園陸上競技場");
+    // 対校選手権（跨日）
+    expect(events[2].dateText).toBe("2025-05-16~2025-05-18");
+    // 駅伝（兼カット + 半角@会場）
+    expect(events[3].name).toBe("北海道知事杯第37回北海道大学駅伝対校選手権大会　真駒内セキスイハイムスタジアム");
+    // 北日本インカレ（・対校得点表除去）
+    expect(events[4].name).toBe("北日本インカレ　円山公園陸上競技場");
+    // 学生CH（大会ページ除去）
+    expect(events[5].name).toBe("第54回学生CH　円山公園陸上競技場");
+    // 学連3戦（大会ページ除去）
+    expect(events[6].name).toBe("学連3戦　円山公園陸上競技場");
   });
 });
 
