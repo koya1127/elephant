@@ -419,6 +419,28 @@ export function EventList() {
     return result;
   }, [events, showPastEvents]);
 
+  // 今年の大会に対する昨年マッチを構築
+  const lastYearMatchMap = useMemo(() => {
+    const map = new Map<string, Event>();
+    const currentYear = new Date().getFullYear();
+    const lastYear = currentYear - 1;
+
+    for (const currentEvent of events) {
+      if (Number(currentEvent.date.slice(0, 4)) !== currentYear) continue;
+      const normalized = normalizeForHistoricalMatch(currentEvent.name);
+      if (normalized.length < 3) continue;
+
+      const month = currentEvent.date.slice(5, 7);
+      const match = events.find(e => {
+        const [ey, em] = e.date.split("-");
+        return Number(ey) === lastYear && em === month
+          && normalizeForHistoricalMatch(e.name) === normalized;
+      });
+      if (match) map.set(currentEvent.id, match);
+    }
+    return map;
+  }, [events]);
+
   // 通常セクションに昨年実績を統合
   const allSections = useMemo(() => {
     type Section = {
@@ -759,6 +781,7 @@ export function EventList() {
                 <EventCard
                   key={event.id}
                   event={event}
+                  lastYearMatch={lastYearMatchMap.get(event.id)}
                   highlightDisciplines={selectedDisciplines}
                   highlightGrades={selectedGrades}
                   normalizeGrade={normalizeGradeCategory}
@@ -767,22 +790,24 @@ export function EventList() {
                 />
               ))}
 
-              {hasCurrentEvents && hasRefEvents && (
-                <div className={styles.referenceSubHeader}>
-                  <span className={styles.referenceSubTitle}>昨年の{section.monthNum}月の大会</span>
-                  <span className={styles.referenceSubText}>今年はまだ登録されていない大会です</span>
-                </div>
+              {hasRefEvents && (
+                <details className={styles.referenceCollapsible}>
+                  <summary className={styles.referenceSummary}>
+                    昨年の大会を見る（{section.referenceEvents.length}件）
+                  </summary>
+                  <div className={styles.referenceContent}>
+                    {section.referenceEvents.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        isLastYearReference
+                        normalizeGrade={normalizeGradeCategory}
+                        enteredEventIds={enteredEventIds}
+                      />
+                    ))}
+                  </div>
+                </details>
               )}
-
-              {hasRefEvents && section.referenceEvents.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  isLastYearReference
-                  normalizeGrade={normalizeGradeCategory}
-                  enteredEventIds={enteredEventIds}
-                />
-              ))}
             </section>
           );
         })

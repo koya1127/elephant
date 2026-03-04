@@ -279,6 +279,76 @@
   border: 1px solid #bbf7d0;
 }
 
+/* --- Compare (last year) --- */
+.compareSection {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.compareBtn {
+  background: none;
+  border: 1px solid #d6d3d1;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #78716c;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.compareBtn:hover {
+  border-color: #a8a29e;
+  color: #57534e;
+  background: #fafaf9;
+}
+
+.comparePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #fafaf9;
+  border: 1px solid #e7e5e4;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #57534e;
+  min-width: 200px;
+}
+
+.compareRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.compareLabel {
+  font-weight: 700;
+  color: #a8a29e;
+  font-size: 11px;
+  min-width: 40px;
+}
+
+.compareArrow {
+  color: #d6d3d1;
+  font-size: 11px;
+}
+
+.compareOld {
+  color: #78716c;
+}
+
+.compareDiff {
+  color: #dc2626;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 /* --- Responsive --- */
 @media (max-width: 600px) {
   .cardHeader {
@@ -306,5 +376,14 @@
   .actions {
     flex-direction: row;
     align-items: center;
+  }
+
+  .compareSection {
+    width: 100%;
+  }
+
+  .comparePanel {
+    min-width: 0;
+    width: 100%;
   }
 }

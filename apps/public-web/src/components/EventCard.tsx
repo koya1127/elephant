@@ -17,6 +17,8 @@ interface EventCardProps {
   historicalDisciplines?: Discipline[] | null;
   /** 昨年実績として表示するか */
   isLastYearReference?: boolean;
+  /** 昨年の対応大会（マッチがある場合） */
+  lastYearMatch?: Event;
 }
 
 const DOW = ["日", "月", "火", "水", "木", "金", "土"] as const;
@@ -29,8 +31,10 @@ export function EventCard({
   enteredEventIds,
   historicalDisciplines,
   isLastYearReference,
+  lastYearMatch,
 }: EventCardProps) {
   const [showAllTags, setShowAllTags] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
   const { month, day, dow } = parseDate(event.date);
   const dateRange = event.dateEnd ? `〜${parseDate(event.dateEnd).day}` : "";
   const isEntered = enteredEventIds?.has(event.id) ?? false;
@@ -93,6 +97,55 @@ export function EventCard({
               )}
             </div>
           </div>
+
+          {lastYearMatch && (
+            <div className={styles.compareSection}>
+              <button
+                className={styles.compareBtn}
+                onClick={() => setShowCompare(!showCompare)}
+              >
+                {showCompare ? "閉じる" : "昨年と比較"}
+              </button>
+              {showCompare && (
+                <div className={styles.comparePanel}>
+                  <div className={styles.compareRow}>
+                    <span className={styles.compareLabel}>日程</span>
+                    <span className={styles.compareOld}>昨年 {formatShortDate(lastYearMatch.date)}</span>
+                    <span className={styles.compareArrow}>→</span>
+                    <span>今年 {formatShortDate(event.date)}</span>
+                  </div>
+                  {lastYearMatch.location && (
+                    <div className={styles.compareRow}>
+                      <span className={styles.compareLabel}>会場</span>
+                      <span className={lastYearMatch.location !== event.location ? styles.compareDiff : undefined}>
+                        {lastYearMatch.location}
+                      </span>
+                      {lastYearMatch.location !== event.location && event.location && (
+                        <>
+                          <span className={styles.compareArrow}>→</span>
+                          <span>{event.location}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {lastYearMatch.fee != null && (
+                    <div className={styles.compareRow}>
+                      <span className={styles.compareLabel}>参加費</span>
+                      <span className={lastYearMatch.fee !== event.fee ? styles.compareDiff : undefined}>
+                        ¥{lastYearMatch.fee.toLocaleString()}
+                      </span>
+                      {lastYearMatch.fee !== event.fee && event.fee != null && (
+                        <>
+                          <span className={styles.compareArrow}>→</span>
+                          <span>¥{event.fee.toLocaleString()}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {!isLastYearReference && (
             <div className={styles.actions}>
