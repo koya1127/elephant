@@ -10,7 +10,7 @@ import {
   type MapMouseEvent,
 } from "@vis.gl/react-google-maps";
 import { useUser, SignInButton } from "@clerk/nextjs";
-import type { Slope, ElevationPoint } from "@/lib/types";
+import type { Slope } from "@/lib/types";
 import { gradientColor } from "@/lib/slope-utils";
 import { SlopeInfoPanel } from "./SlopeInfoPanel";
 import { SlopeAddForm } from "./SlopeAddForm";
@@ -49,19 +49,11 @@ function SlopePolylines({
     polylinesRef.current = [];
 
     for (const slope of slopes) {
-      const profile = slope.elevationProfile as ElevationPoint[] | undefined;
-      // ポリラインのパスを構築（プロファイルがあれば中間点も使う）
+      // 道路形状データがあればそのまま使う（実際の道路に沿った描画）
+      // なければstart/endの直線フォールバック
       let path: { lat: number; lng: number }[];
-      if (profile && profile.length >= 2) {
-        const totalDist = profile[profile.length - 1].dist;
-        path = profile.map((p) => {
-          if (totalDist === 0) return { lat: slope.lat, lng: slope.lng };
-          const t = p.dist / totalDist;
-          return {
-            lat: slope.lat + (slope.latEnd - slope.lat) * t,
-            lng: slope.lng + (slope.lngEnd - slope.lng) * t,
-          };
-        });
+      if (slope.geometry && slope.geometry.length >= 2) {
+        path = slope.geometry;
       } else {
         path = [
           { lat: slope.lat, lng: slope.lng },

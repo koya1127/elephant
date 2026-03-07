@@ -221,6 +221,9 @@ export async function POST(req: NextRequest) {
     const id = crypto.randomUUID().slice(0, 12);
     const slopeName = way.tags?.name || `坂道 #${osmId}`;
 
+    // OSM道路ノード座標列を保存（ポリライン描画用）
+    const roadGeometry = geom.map((g) => ({ lat: g.lat, lng: g.lon }));
+
     await db.insert(slopes).values({
       id,
       name: slopeName,
@@ -234,6 +237,7 @@ export async function POST(req: NextRequest) {
       gradient: stats.gradient,
       crossStreets: crosses,
       elevationProfile: profile,
+      geometry: roadGeometry,
       osmWayId: osmId,
       source: "auto",
       userId,
