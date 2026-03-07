@@ -16,6 +16,7 @@ export const maxDuration = 300; // 5分
 interface OverpassWay {
   id: number;
   geometry: { lat: number; lon: number }[];
+  nodes?: number[];
   tags?: Record<string, string>;
 }
 
@@ -73,6 +74,7 @@ async function fetchRoads(
       ways.push({
         id: el.id,
         geometry: el.geometry,
+        nodes: el.nodes,
         tags: el.tags,
       });
       // ノードカウント
@@ -89,15 +91,14 @@ async function fetchRoads(
 
 /** wayのノードのうち複数wayで共有されているもの = 交差点 */
 function countCrossStreets(
-  way: OverpassWay & { nodes?: number[] },
+  way: OverpassWay,
   nodeCounts: Map<number, number>
 ): number {
-  if (!("nodes" in way) || !Array.isArray((way as OverpassElement).nodes)) return 0;
-  const nodes = (way as OverpassElement).nodes!;
+  if (!way.nodes || way.nodes.length === 0) return 0;
   // 端点以外で複数wayに属するノード数
   let count = 0;
-  for (let i = 1; i < nodes.length - 1; i++) {
-    if ((nodeCounts.get(nodes[i]) || 0) > 1) count++;
+  for (let i = 1; i < way.nodes.length - 1; i++) {
+    if ((nodeCounts.get(way.nodes[i]) || 0) > 1) count++;
   }
   return count;
 }
@@ -171,11 +172,8 @@ export async function POST(req: NextRequest) {
     if (dist < 50 || dist > 500) continue;
 
     // 交差点チェック（中間ノードで2つ以上の交差 = 車多め）
-    const crosses = countCrossStreets(
-      way as OverpassWay & { nodes?: number[] },
-      nodeCounts
-    );
-    if (crosses > 3) continue;
+    const crosses = countCrossStreets(way, nodeCounts);
+    if (crosses > 0) continue;
 
     // 標高プロファイル取得（10点サンプリング）
     const samplePoints = [];
