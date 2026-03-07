@@ -343,6 +343,58 @@ export function SlopeMap() {
   );
 }
 
+/** 検出エリア境界を矩形で表示するコンポーネント */
+function DetectBoundsOverlay({ detecting }: { detecting: boolean }) {
+  const map = useMap();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rectRef = useRef<any>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gm = typeof window !== "undefined" ? (window as any).google : null;
+    if (!map || !gm) return;
+
+    // 矩形を作成
+    const rect = new gm.maps.Rectangle({
+      strokeColor: "#7c3aed",
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      fillColor: "#7c3aed",
+      fillOpacity: 0.08,
+      map,
+      bounds: map.getBounds(),
+      clickable: false,
+      zIndex: 0,
+    });
+    rectRef.current = rect;
+
+    // マップ移動/ズーム時に矩形を更新
+    const listener = map.addListener("bounds_changed", () => {
+      const bounds = map.getBounds();
+      if (bounds) rect.setBounds(bounds);
+    });
+
+    return () => {
+      gm.maps.event.removeListener(listener);
+      rect.setMap(null);
+      rectRef.current = null;
+    };
+  }, [map]);
+
+  // 検出中は色を変える
+  useEffect(() => {
+    if (rectRef.current) {
+      rectRef.current.setOptions({
+        strokeColor: detecting ? "#eab308" : "#7c3aed",
+        fillColor: detecting ? "#eab308" : "#7c3aed",
+        fillOpacity: detecting ? 0.12 : 0.08,
+      });
+    }
+  }, [detecting]);
+
+  return null;
+}
+
 /** Map内部コンポーネント（useMapを使うためAPIProvider内に配置） */
 function MapInner({
   slopes,
@@ -387,6 +439,9 @@ function MapInner({
           selectedId={selectedSlope?.id || null}
           onSelect={onSelectSlope}
         />
+
+        {/* 管理者用: 検出エリア境界表示 */}
+        {isAdmin && !addMode && <DetectBoundsOverlay detecting={detecting} />}
 
         {/* スタートマーカー（追加モード） */}
         {startCoords && (
