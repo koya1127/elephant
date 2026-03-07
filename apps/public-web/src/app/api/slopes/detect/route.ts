@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { slopes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -103,24 +102,11 @@ function countCrossStreets(
   return count;
 }
 
-/** POST /api/slopes/detect — 自動検出（admin専用） */
+/** POST /api/slopes/detect — 自動検出（ログインユーザー） */
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
-  }
-
-  // admin チェック
-  let isAdmin = false;
-  try {
-    const client = await clerkClient();
-    const user = await client.users.getUser(userId);
-    isAdmin = (user.publicMetadata as Record<string, unknown>)?.role === "admin";
-  } catch {
-    // pass
-  }
-  if (!isAdmin) {
-    return NextResponse.json({ error: "管理者権限が必要です" }, { status: 403 });
   }
 
   const body = await req.json();
