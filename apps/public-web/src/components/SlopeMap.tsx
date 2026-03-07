@@ -191,7 +191,7 @@ export function SlopeMap() {
 
   const handleDetect = useCallback(
     async (map: GMap) => {
-      if (!isAdmin || detecting) return;
+      if (!isSignedIn || detecting) return;
       const bounds = map.getBounds();
       if (!bounds) return;
 
@@ -224,7 +224,7 @@ export function SlopeMap() {
         setDetecting(false);
       }
     },
-    [isAdmin, detecting, fetchSlopes]
+    [isSignedIn, detecting, fetchSlopes]
   );
 
   const cancelAdd = () => {
@@ -303,7 +303,7 @@ export function SlopeMap() {
             startCoords={startCoords}
             endCoords={endCoords}
             addMode={addMode}
-            isAdmin={isAdmin}
+            isSignedIn={!!isSignedIn}
             detecting={detecting}
             onMapClick={handleMapClick}
             onSelectSlope={setSelectedSlope}
@@ -402,7 +402,7 @@ function MapInner({
   startCoords,
   endCoords,
   addMode,
-  isAdmin,
+  isSignedIn,
   detecting,
   onMapClick,
   onSelectSlope,
@@ -413,7 +413,7 @@ function MapInner({
   startCoords: { lat: number; lng: number } | null;
   endCoords: { lat: number; lng: number } | null;
   addMode: boolean;
-  isAdmin: boolean;
+  isSignedIn: boolean;
   detecting: boolean;
   onMapClick: (e: MapMouseEvent) => void;
   onSelectSlope: (slope: Slope) => void;
@@ -441,7 +441,7 @@ function MapInner({
         />
 
         {/* 管理者用: 検出エリア境界表示 */}
-        {isAdmin && !addMode && <DetectBoundsOverlay detecting={detecting} />}
+        {isSignedIn && !addMode && <DetectBoundsOverlay detecting={detecting} />}
 
         {/* スタートマーカー（追加モード） */}
         {startCoords && (
@@ -463,7 +463,7 @@ function MapInner({
       </Map>
 
       {/* 管理者用: 検出ボタン */}
-      {isAdmin && !addMode && map && (
+      {isSignedIn && !addMode && map && (
         <button
           className={styles.detectBtn}
           onClick={() => onDetect(map)}
