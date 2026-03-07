@@ -100,6 +100,7 @@ export const slopes = pgTable(
     gradient: doublePrecision("gradient").notNull(),
     crossStreets: integer("cross_streets").default(0),
     elevationProfile: jsonb("elevation_profile").default([]),
+    geometry: jsonb("geometry").default([]),
     osmWayId: text("osm_way_id"),
     source: text("source").notNull(), // "auto" | "manual"
     userId: text("user_id").notNull(),

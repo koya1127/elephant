@@ -115,6 +115,7 @@ export interface Slope {
   gradient: number; // 勾配(%)
   crossStreets: number;
   elevationProfile: ElevationPoint[];
+  geometry?: { lat: number; lng: number }[];
   osmWayId?: string | null;
   source: "auto" | "manual";
   userId: string;
