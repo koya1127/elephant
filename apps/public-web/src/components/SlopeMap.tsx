@@ -11,7 +11,7 @@ import {
 } from "@vis.gl/react-google-maps";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import type { Slope } from "@/lib/types";
-import { gradientColor } from "@/lib/slope-utils";
+import { gradientColor, gradientLabel } from "@/lib/slope-utils";
 import { SlopeInfoPanel } from "./SlopeInfoPanel";
 import { SlopeAddForm } from "./SlopeAddForm";
 import styles from "./SlopeMap.module.css";
@@ -36,6 +36,8 @@ function SlopePolylines({
 }) {
   const map = useMap();
   const polylinesRef = useRef<GPolyline[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const infoWindowRef = useRef<any>(null);
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,6 +49,12 @@ function SlopePolylines({
       pl.setMap(null);
     }
     polylinesRef.current = [];
+
+    // InfoWindow（ツールチップ用、1つを使い回す）
+    if (!infoWindowRef.current) {
+      infoWindowRef.current = new gm.maps.InfoWindow({ disableAutoPan: true });
+    }
+    const infoWindow = infoWindowRef.current;
 
     for (const slope of slopes) {
       // 道路形状データがあればそのまま使う（実際の道路に沿った描画）
@@ -74,6 +82,27 @@ function SlopePolylines({
       });
 
       polyline.addListener("click", () => onSelect(slope));
+
+      // ホバーでツールチップ表示
+      polyline.addListener("mouseover", (e: { latLng: { lat: () => number; lng: () => number } }) => {
+        const label = gradientLabel(slope.gradient);
+        const dist = slope.distance >= 1000
+          ? `${(slope.distance / 1000).toFixed(1)}km`
+          : `${Math.round(slope.distance)}m`;
+        infoWindow.setContent(
+          `<div style="font-size:13px;line-height:1.6;padding:2px 4px">` +
+          `<strong>${slope.name}</strong><br>` +
+          `${label} ${slope.gradient}% ・ ${dist} ・ ↑${slope.elevationGain}m` +
+          `</div>`
+        );
+        infoWindow.setPosition(e.latLng);
+        infoWindow.open(map);
+      });
+
+      polyline.addListener("mouseout", () => {
+        infoWindow.close();
+      });
+
       polylinesRef.current.push(polyline);
     }
 
